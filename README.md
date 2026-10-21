@@ -9,7 +9,8 @@ From PureRef 2, save with *Save as → Legacy PureRef scene* first.
 
 ## Using it
 - The canvas fills the screen (dot background by default; grid or plain in ☰ → Canvas). Floating buttons: ☰ menu and scene name top-left, ↶ ↷ and 👁 focus mode top-right, ＋ bottom-right. UI inspired by VizRef.
-- **＋** adds images and videos. You can also paste them, paste a link, or use *Share → DroRef* from any app.
+- **＋** adds images and videos. You can also paste them, paste a link, use *Share → DroRef*, or **drag and drop** them from another app (gallery, browser, files) in split screen: they land where you drop them.
+- To drag an image **out** to another app, select it, then long-press it again and drag.
 - Drag empty space to pan, pinch to zoom, double-tap to focus.
 - Tap to select. Drag to move; pinch or twist with two fingers to scale and rotate.
 - Long-press an item to add it to the selection. Long-press empty space and drag to select a rectangle; release without dragging for the canvas menu.

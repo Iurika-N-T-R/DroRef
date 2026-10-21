@@ -21,6 +21,7 @@ import android.text.Spanned
 import android.text.style.AlignmentSpan
 import android.text.style.BulletSpan
 import android.text.style.RelativeSizeSpan
+import android.view.DragEvent
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.Menu
@@ -138,8 +139,10 @@ class MainActivity : Activity(), BoardView.Host {
             setPadding(px(14), 0, px(14), 0)
             setOnClickListener { openScene() }
             layoutParams = LinearLayout.LayoutParams(-2, px(44)).apply { setMargins(px(4), px(4), px(4), px(4)) }
+            minWidth = 0
         }
         menuBtn = round("☰", s(R.string.settings)) { openMenu() }
+        // the name gets whatever room is left between the buttons, shrinking with "…" in narrow windows
         topLeft = LinearLayout(this).apply { addView(menuBtn); addView(titleView) }
         eyeBtn = round("👁", s(R.string.focus_mode)) { setFocusMode(!focusMode) }
         undoBtns = listOf(round("↶", s(R.string.undo)) { board.undo() }, round("↷", s(R.string.redo)) { board.redo() })
@@ -150,8 +153,10 @@ class MainActivity : Activity(), BoardView.Host {
         }
         val ui = FrameLayout(this).apply {
             clipToPadding = false
-            addView(topLeft, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply { setMargins(px(8), px(8), 0, 0) })
-            addView(topRight, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply { setMargins(0, px(8), px(8), 0) })
+            addView(LinearLayout(this@MainActivity).apply {
+                addView(topLeft, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(topRight, LinearLayout.LayoutParams(-2, -2))
+            }, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply { setMargins(px(8), px(8), px(8), 0) })
             addView(info, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { setMargins(px(16), px(64), px(16), 0) })
             addView(barScroll, FrameLayout.LayoutParams(-2, px(52), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { setMargins(px(12), 0, px(12), px(12)) })
             addView(addBtn)
@@ -164,6 +169,7 @@ class MainActivity : Activity(), BoardView.Host {
                 ins
             }
         }
+        board.setOnDragListener { _, e -> onDrag(e) }
         setContentView(FrameLayout(this).apply { addView(board); addView(ui) })
         edgeToEdge() // needs the window's views, so after setContentView
         remember(scene)
@@ -224,6 +230,32 @@ class MainActivity : Activity(), BoardView.Host {
     override fun onStop() {
         super.onStop()
         board.releaseMedia()
+    }
+
+    // ---- drag and drop from other apps (gallery, browser, files…)
+
+    private fun onDrag(e: DragEvent): Boolean = when (e.action) {
+        DragEvent.ACTION_DRAG_STARTED -> e.localState !== DRAG_SELF
+        DragEvent.ACTION_DRAG_ENTERED -> { board.dropHint = true; true }
+        DragEvent.ACTION_DRAG_EXITED, DragEvent.ACTION_DRAG_ENDED -> { board.dropHint = false; true }
+        DragEvent.ACTION_DROP -> { board.dropHint = false; drop(e); true }
+        else -> true
+    }
+
+    /** Images and videos land where they're dropped; a dropped link brings in its images; other text becomes a note. */
+    private fun drop(e: DragEvent) {
+        val clip = e.clipData ?: return
+        val perms = requestDragAndDropPermissions(e) // read access to the other app's files, until released
+        val u = uris(clip)
+        if (u.isNotEmpty()) {
+            board.addImages(u.map(::src), floatArrayOf(e.x, e.y)) { n ->
+                perms?.release()
+                if (n < u.size) toast(s(R.string.cant_open, u.size - n))
+            }
+        } else {
+            perms?.release()
+            clip.getItemAt(0).coerceToText(this)?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { pasteText(it, fromShare = true) }
+        }
     }
 
     private fun handle(i: Intent) {

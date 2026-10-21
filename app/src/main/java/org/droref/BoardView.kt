@@ -3,6 +3,8 @@ package org.droref
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
+import android.content.ClipData
+import android.content.ClipDescription
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -45,6 +47,8 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 const val GRID = 50f
+/** Marks drags that started in DroRef itself, so the board doesn't take its own drops. */
+val DRAG_SELF = Any()
 private const val MIN_ZOOM = 0.005f
 private const val MAX_ZOOM = 64f
 
@@ -195,6 +199,8 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     val selection = LinkedHashSet<Long>()
     var picking = false
     var viewOnly = false // focus mode: look, pan, zoom; nothing moves
+    var dropHint = false // something is being dragged over the board from another app
+        set(v) { field = v; invalidate() }
     var cropId = -1L
         private set
     var background = 0 // floating window: 0 solid, 1 glass, 2 none
@@ -542,7 +548,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     // ---- adding
 
     /** Copies images and videos into the scene folder (so the board survives the originals being deleted), then places them. */
-    fun addImages(srcs: List<Src>, done: (Int) -> Unit = {}) {
+    fun addImages(srcs: List<Src>, at: FloatArray? = null, done: (Int) -> Unit = {}) {
         val sc = scene
         thread {
             val made = srcs.mapNotNull { s ->
@@ -560,7 +566,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
                 }.getOrNull()
             }
             post {
-                if (sc === scene && made.isNotEmpty()) place(made.map { it.copy(id = scene.newId()) })
+                if (sc === scene && made.isNotEmpty()) place(made.map { it.copy(id = scene.newId()) }, at)
                 done(made.size)
             }
         }
@@ -573,7 +579,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     }
 
     /** New items: sized to the screen, packed (PureRef's "select and pack new images"), centered, selected. */
-    private fun place(new: List<Item>) {
+    private fun place(new: List<Item>, at: FloatArray? = null) {
         val s = camScale()
         val sized = new.map {
             val k = if (it.type == NOTE) 0.7f * dp / s else min(1f, viewW() * 0.5f / (max(it.w, it.h) * s))
@@ -584,7 +590,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
             viewW().toFloat() / viewH(), 0f, 0f,
         ) else sized.mapIndexed { i, it -> it.moveBy(i * 30f / s, i * 30f / s) }
         val r = packed.union()
-        val c = toBoard(viewW() / 2f, viewH() / 2f)
+        val c = at?.let { toBoard(it[0], it[1]) } ?: toBoard(viewW() / 2f, viewH() / 2f) // dropped items land under the finger
         val placed = packed.map { it.moveBy(c[0] - r.centerX(), c[1] - r.centerY()) }
         scene.checkpoint()
         scene.items += placed
@@ -890,6 +896,10 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
                 if (tool == T_PEN) p else floatArrayOf(p[0], p[1], p[p.size - 2], p[p.size - 1])), 255, null)
         }
         c.restore()
+        if (dropHint) {
+            outline.strokeWidth = 4 * dp
+            c.drawRect(2 * dp, 2 * dp, width - 2 * dp, height - 2 * dp, outline)
+        }
         if (rubberOn) {
             val r = RectF(min(rubber.left, rubber.right), min(rubber.top, rubber.bottom), max(rubber.left, rubber.right), max(rubber.top, rubber.bottom))
             c.drawRect(r, rubberFill)
@@ -1146,6 +1156,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         val h = downHit
         when {
             any != null && any.locked && h == null -> { g = G.NONE; host?.lockedPressed(any) }
+            h != null && selection.size == 1 && h.id in selection && h.isMedia && dragOut(h) -> g = G.NONE
             h != null -> {
                 if (!selection.remove(h.id)) selection += h.id
                 g = G.NONE
@@ -1155,6 +1166,20 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
             Prefs.canvasLocked -> { g = G.NONE; host?.canvasMenu() }
             else -> { g = G.RUBBER; rubberOn = true; rubber.set(e.x, e.y, e.x, e.y) }
         }
+    }
+
+    /** Starts a system drag of the image file, so it can be dropped into another app. */
+    private fun dragOut(it: Item): Boolean {
+        val f = File(scene.images, it.file)
+        val thumb = bitmaps[f.path] ?: return false
+        val mime = if (it.type == VIDEO) "video/mp4" else imageMime(f) ?: "image/png"
+        val ext = mime.substringAfter('/').replace("jpeg", "jpg")
+        val uri = Uri.Builder().scheme("content").authority("${context.packageName}.files")
+            .appendPath(scene.dir.name).appendPath(it.file)
+            .appendQueryParameter("name", "${it.name.ifEmpty { "image" }}.$ext").build()
+        // ponytail: drags the original file; a cropped image goes out uncropped
+        val clip = ClipData(ClipDescription(it.name, arrayOf(mime)), ClipData.Item(uri))
+        return startDragAndDrop(clip, ThumbShadow(thumb, (160 * dp).toInt()), DRAG_SELF, DRAG_FLAG_GLOBAL or DRAG_FLAG_GLOBAL_URI_READ)
     }
 
     private fun selectRubber() {

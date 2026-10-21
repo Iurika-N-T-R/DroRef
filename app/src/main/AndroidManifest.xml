@@ -52,5 +52,11 @@
             </intent-filter>
         </activity>
         <service android:name=".OverlayService" android:exported="false" />
+        <!-- images dragged out of DroRef into other apps -->
+        <provider
+            android:name=".FilesProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

@@ -5,7 +5,8 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 
 ## Adding
 - ✅ Import images and videos (＋, Ctrl+I) · ✅ paste image (Ctrl+V) · ✅ paste/share a URL → that image, or every image on the page
-- ✅ Share → DroRef from gallery/browser (Android's drag & drop) · ✅ everything is embedded in the scene
+- ✅ Drag and drop from other apps (gallery, browser, files; split screen or floating windows), dropped where you release · ✅ drag an image out to another app (long-press a selected image)
+- ✅ Share → DroRef from gallery/browser · ✅ everything is embedded in the scene
 - 🔜 Manage images (downscale / convert / link vs embed)
 
 ## Selecting & editing
