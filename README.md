@@ -32,6 +32,8 @@ Test the `.pur` reader and writer:
 
 That writes `kt_edit.pur` into the folder. Check it with real PureRef: `PureRef -c 'load;/tmp/pur/kt_edit.pur' -c 'exportScene;/tmp/pur/out.png' -c exit`
 
+The launcher icon comes from `art/icon.png`: run `python3 -I tools/icon.py` to regenerate every size.
+
 Translations live in one table, `tools/strings.py`. Edit it and run `python3 tools/strings.py` to regenerate every `strings.xml`.
 `tools/ui.py` drives an emulator for quick UI checks (tap by label, screenshot).
 

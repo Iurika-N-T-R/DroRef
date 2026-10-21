@@ -16,10 +16,9 @@
         </intent>
     </queries>
 
-    <!-- ponytail: system icon, swap for your own in res/mipmap when you have one -->
     <application
         android:label="@string/app_name"
-        android:icon="@android:drawable/ic_menu_gallery"
+        android:icon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault">
         <activity
