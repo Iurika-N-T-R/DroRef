@@ -37,6 +37,16 @@ The launcher icon comes from `art/icon.png`: run `python3 -I tools/icon.py` to r
 Translations live in one table, `tools/strings.py`. Edit it and run `python3 tools/strings.py` to regenerate every `strings.xml`.
 `tools/ui.py` drives an emulator for quick UI checks (tap by label, screenshot).
 
+## Release
+Download the APK from [Releases](../../releases), or build it:
+
+    ./gradlew assembleRelease   # signed APK  -> app/build/outputs/apk/release/
+    ./gradlew bundleRelease     # signed AAB for Google Play -> app/build/outputs/bundle/release/
+
+Signing reads `keystore.properties` (git-ignored): `storeFile`, `storePassword`, `keyAlias`, `keyPassword`.
+Without it, release builds are unsigned, which is what F-Droid expects (it signs with its own key).
+Store listing text and screenshots for F-Droid live in `fastlane/metadata/android/`.
+
 ## Credits
 - `.pur` format: ported from [FyorDev/PureRef-format](https://github.com/FyorDev/PureRef-format) (MIT)
 - Video loops idea: [lettucegoblin/AnimRef](https://github.com/lettucegoblin/AnimRef) (MIT)

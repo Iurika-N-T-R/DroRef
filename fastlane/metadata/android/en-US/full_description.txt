@@ -1,0 +1,30 @@
+DroRef is a free, open-source reference board for Android, inspired by PureRef. Collect your reference images on an infinite canvas, arrange them, and keep them on top of your drawing app.
+
+<b>Boards that move between phone and PC</b>
+Open and save PureRef .pur files (legacy format), so a board made on your phone opens in PureRef on your computer, and back. DroRef is an independent app, not affiliated with PureRef or Idyllic Pixel. On PC, use the original PureRef: https://www.pureref.com
+
+<b>Collect</b>
+* Add images and videos from the gallery, paste them, share them to DroRef, or drag and drop them from another app
+* Paste a link to pull in the image, or the images on the page
+
+<b>Arrange</b>
+* Move, scale and rotate with your fingers; crop, flip, grayscale, opacity, lock
+* Arrange, align, distribute, stack and normalize sizes
+* Groups, parenting and a hierarchy view
+* Undo / redo, copy / cut / paste, command palette
+
+<b>Study</b>
+* Animated GIFs with play, pause, frame step, scrub and speed
+* Videos that loop between two points
+* Color picker and image coordinates, grayscale canvas, slideshow, focus mode
+
+<b>Annotate</b>
+* Rich-text notes with checklists, lists and links
+* Drawing: pen, line, rectangle, ellipse, eraser, arrows
+* Comments on images
+
+<b>Always on top</b>
+* Float the board over any app, or over just one app
+* Adjustable opacity, transparent to touch for tracing, background off so only the images float
+
+Dot or grid background, dark, light and glass themes, in English, French, Spanish, Japanese, Korean and Chinese.

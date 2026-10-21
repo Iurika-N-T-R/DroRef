@@ -1,0 +1,1 @@
+First release: infinite reference board, PureRef .pur open/save, GIF and video loops, groups, notes, drawing, floating window over other apps, drag and drop between apps.
