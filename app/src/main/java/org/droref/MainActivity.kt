@@ -7,7 +7,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.RectF
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -27,15 +29,16 @@ import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.inputmethod.BaseInputConnection
-import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
+import android.widget.ArrayAdapter
+import android.widget.GridLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.PopupMenu
 import android.graphics.drawable.GradientDrawable
 import android.widget.SeekBar
 import android.widget.TextView
@@ -60,22 +63,17 @@ private const val CLIP_LABEL = "droref-items"
 class MainActivity : Activity(), BoardView.Host {
     private lateinit var board: BoardView
     private lateinit var bar: LinearLayout
-    private lateinit var barScroll: HorizontalScrollView
     private lateinit var info: TextView
     private var infoHex = ""
     private var exportItems: List<Item> = emptyList()
-    private val actions = HashMap<Int, () -> Unit>()
-    private val menuEntries = ArrayList<Pair<String, () -> Unit>>() // for the command palette
-    private val barEntries = ArrayList<Pair<String, () -> Unit>>()
-    private var menuPrefix = ""
     private var exportJpg = false
     private lateinit var titleView: TextView
-    private lateinit var menuBtn: TextView
-    private lateinit var eyeBtn: TextView
-    private lateinit var addBtn: TextView
+    private lateinit var menuBtn: ImageView
+    private lateinit var eyeBtn: ImageView
+    private lateinit var addBtn: ImageView
     private lateinit var topLeft: LinearLayout
     private lateinit var topRight: LinearLayout
-    private lateinit var undoBtns: List<TextView>
+    private lateinit var undoBtns: List<ImageView>
     private var focusMode = false
 
     private fun s(id: Int, vararg args: Any) = getString(id, *args)
@@ -89,13 +87,19 @@ class MainActivity : Activity(), BoardView.Host {
     private val chipLine get() = if (light) 0x22000000 else 0x33FFFFFF
     private val chipFg get() = if (light) 0xFF222222.toInt() else 0xFFFFFFFF.toInt()
 
+    /** A Lucide icon (res/drawable/ic_*), tinted. */
+    private fun ic(id: Int, color: Int = chipFg): Drawable = getDrawable(id)!!.mutate().apply { setTint(color) }
+
+    /** The theme's text color, for icons in dialogs. */
+    private val textColor by lazy { obtainStyledAttributes(intArrayOf(android.R.attr.textColorPrimary)).run { getColor(0, chipFg).also { recycle() } } }
+
+    private fun tip(v: View, text: String) { v.contentDescription = text; if (Build.VERSION.SDK_INT >= 26) v.tooltipText = text }
+
     /** Round floating button, VizRef-style. */
-    private fun round(label: String, desc: String, f: () -> Unit) = TextView(this).apply {
-        text = label
-        contentDescription = desc
-        gravity = Gravity.CENTER
-        textSize = 18f
-        setTextColor(chipFg)
+    private fun round(iconId: Int, desc: String, f: () -> Unit) = ImageView(this).apply {
+        setImageDrawable(ic(iconId))
+        scaleType = ImageView.ScaleType.CENTER
+        tip(this, desc)
         background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(chipBg); setStroke(px(1), chipLine) }
         elevation = 6 * dp
         setOnClickListener { f() }
@@ -118,11 +122,11 @@ class MainActivity : Activity(), BoardView.Host {
             elevation = 6 * dp
             setOnClickListener { copyText(infoHex) }
         }
-        bar = LinearLayout(this).apply { setPadding(px(6), 0, px(6), 0) }
-        barScroll = HorizontalScrollView(this).apply {
-            addView(bar)
+        // the toolbar: a short pill of icons that fits the screen (no sideways scrolling); the rest is in "more"
+        bar = LinearLayout(this).apply {
+            setPadding(px(6), 0, px(6), 0)
+            gravity = Gravity.CENTER_VERTICAL
             visibility = View.GONE
-            isHorizontalScrollBarEnabled = false
             background = pill()
             elevation = 8 * dp
         }
@@ -141,14 +145,13 @@ class MainActivity : Activity(), BoardView.Host {
             layoutParams = LinearLayout.LayoutParams(-2, px(44)).apply { setMargins(px(4), px(4), px(4), px(4)) }
             minWidth = 0
         }
-        menuBtn = round("☰", s(R.string.settings)) { openMenu() }
+        menuBtn = round(R.drawable.ic_menu, s(R.string.menu)) { mainSheet() }
         // the name gets whatever room is left between the buttons, shrinking with "…" in narrow windows
         topLeft = LinearLayout(this).apply { addView(menuBtn); addView(titleView) }
-        eyeBtn = round("👁", s(R.string.focus_mode)) { setFocusMode(!focusMode) }
-        undoBtns = listOf(round("↶", s(R.string.undo)) { board.undo() }, round("↷", s(R.string.redo)) { board.redo() })
+        eyeBtn = round(R.drawable.ic_eye, s(R.string.focus_mode)) { setFocusMode(!focusMode) }
+        undoBtns = listOf(round(R.drawable.ic_undo_2, s(R.string.undo)) { board.undo() }, round(R.drawable.ic_redo_2, s(R.string.redo)) { board.redo() })
         topRight = LinearLayout(this).apply { undoBtns.forEach(::addView); addView(eyeBtn) }
-        addBtn = round("＋", s(R.string.add_images)) { pickMedia(REQ_ADD, multiple = true) }.apply {
-            textSize = 24f
+        addBtn = round(R.drawable.ic_plus, s(R.string.add_images)) { pickMedia(REQ_ADD, multiple = true) }.apply {
             layoutParams = FrameLayout.LayoutParams(px(56), px(56), Gravity.BOTTOM or Gravity.END).apply { setMargins(0, 0, px(16), px(16)) }
         }
         val ui = FrameLayout(this).apply {
@@ -158,7 +161,7 @@ class MainActivity : Activity(), BoardView.Host {
                 addView(topRight, LinearLayout.LayoutParams(-2, -2))
             }, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply { setMargins(px(8), px(8), px(8), 0) })
             addView(info, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { setMargins(px(16), px(64), px(16), 0) })
-            addView(barScroll, FrameLayout.LayoutParams(-2, px(52), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { setMargins(px(12), 0, px(12), px(12)) })
+            addView(bar, FrameLayout.LayoutParams(-2, px(56), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { setMargins(px(12), 0, px(12), px(12)) })
             addView(addBtn)
             setOnApplyWindowInsetsListener { v, ins ->
                 @Suppress("DEPRECATION")
@@ -200,15 +203,9 @@ class MainActivity : Activity(), BoardView.Host {
         val v = if (on) View.GONE else View.VISIBLE
         topLeft.visibility = v
         undoBtns.forEach { it.visibility = v }
-        eyeBtn.alpha = if (on) 0.5f else 1f
+        eyeBtn.alpha = if (on) 0.6f else 1f
+        eyeBtn.setImageDrawable(ic(if (on) R.drawable.ic_eye_off else R.drawable.ic_eye))
         selectionChanged()
-    }
-
-    private fun openMenu() {
-        val p = PopupMenu(this, menuBtn)
-        buildMenu(p.menu)
-        p.setOnMenuItemClickListener { item -> actions[item.itemId]?.let { it(); true } ?: false }
-        p.show()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -285,250 +282,283 @@ class MainActivity : Activity(), BoardView.Host {
         remember(sc)
     }
 
-    // ---- menu
+    // ---- the main panel: actions grouped by purpose, settings and search apart
 
-    private fun Menu.act(title: String, always: Boolean = false, checked: Boolean? = null, name: String = title, f: () -> Unit) {
-        val id = actions.size + 1
-        actions[id] = f
-        menuEntries += (menuPrefix + name) to f
-        add(Menu.NONE, id, Menu.NONE, title).apply {
-            if (always) setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
-            if (checked != null) { isCheckable = true; isChecked = checked }
-        }
-    }
+    private fun mainSections(): List<Section> = listOf(
+        Section(s(R.string.add_section), Palette.GREEN, listOf(
+            Tile(R.drawable.ic_image_plus, s(R.string.add_images)) { pickMedia(REQ_ADD, multiple = true) },
+            Tile(R.drawable.ic_clipboard_paste, s(R.string.paste)) { paste() },
+            Tile(R.drawable.ic_sticky_note, s(R.string.add_note)) { noteEditor(null) },
+            Tile(R.drawable.ic_pencil, s(R.string.draw)) { board.startDrawing() },
+        )),
+        Section(s(R.string.board_section), Palette.BLUE, listOf(
+            Tile(R.drawable.ic_scan, s(R.string.select_all)) { board.selectAll() },
+            Tile(R.drawable.ic_layout_dashboard, s(R.string.arrange_all)) { board.clearSelection(); board.arrange("optimal") },
+            Tile(R.drawable.ic_list_tree, s(R.string.hierarchy)) { hierarchy() },
+            Tile(R.drawable.ic_presentation, s(R.string.slideshow)) { board.startSlideshow() },
+            Tile(R.drawable.ic_picture_in_picture_2, s(R.string.always_on_top)) { alwaysOnTop() },
+            Tile(R.drawable.ic_eye, s(R.string.focus_mode)) { setFocusMode(true) },
+        )),
+        Section(s(R.string.file), Palette.ORANGE, listOf(
+            Tile(R.drawable.ic_folders, s(R.string.my_scenes)) { openScene() },
+            Tile(R.drawable.ic_file_plus, s(R.string.new_scene)) { switchTo(Scene.create(this, s(R.string.untitled))) },
+            Tile(R.drawable.ic_folder_open, s(R.string.open_pur)) { openPur() },
+            Tile(R.drawable.ic_save, s(R.string.save)) { save() },
+            Tile(R.drawable.ic_save_all, s(R.string.save_as)) { saveAs() },
+            Tile(R.drawable.ic_image_down, s(R.string.export_png)) { exportItems = board.scene.items.toList(); create(REQ_PNG, "image/png", "${board.scene.name}.png") },
+            Tile(R.drawable.ic_images, s(R.string.export_images)) { exportItems = board.ordered(); exportFiles() },
+            Tile(R.drawable.ic_pencil_line, s(R.string.rename)) { editText(s(R.string.scene_name), board.scene.name) { board.scene.name = it; board.scene.save(); title = it; titleView.text = it } },
+            Tile(R.drawable.ic_copy, s(R.string.duplicate_scene)) { board.scene.save(); switchTo(board.scene.copy(this, s(R.string.copy_of, board.scene.name))) },
+            Tile(R.drawable.ic_trash, s(R.string.delete_scene), color = Palette.RED) { deleteScene() },
+        )),
+        Section(s(R.string.view), Palette.PURPLE, listOf(
+            Tile(R.drawable.ic_grip, s(R.string.grid_dots), Prefs.grid == 2) { Prefs.grid = 2; board.invalidate() },
+            Tile(R.drawable.ic_grid_3x3, s(R.string.grid_lines), Prefs.grid == 1) { Prefs.grid = 1; board.invalidate() },
+            Tile(R.drawable.ic_square, s(R.string.grid_none), Prefs.grid == 0) { Prefs.grid = 0; board.invalidate() },
+            Tile(R.drawable.ic_magnet, s(R.string.snap), Prefs.snap) { Prefs.snap = !Prefs.snap },
+            Tile(R.drawable.ic_lock, s(R.string.lock_canvas), Prefs.canvasLocked) { toggleCanvasLock() },
+            Tile(R.drawable.ic_contrast, s(R.string.grayscale_canvas), Prefs.canvasGray) { Prefs.canvasGray = !Prefs.canvasGray; board.invalidate() },
+            Tile(R.drawable.ic_pipette, s(R.string.picker), board.picking) { setPicking(!board.picking) },
+            Tile(R.drawable.ic_maximize, s(R.string.focus_canvas)) { board.focusAll() },
+            Tile(R.drawable.ic_zoom_in, s(R.string.reset_zoom)) { board.resetZoom() },
+            Tile(R.drawable.ic_locate_fixed, s(R.string.reset_camera)) { board.resetCamera() },
+        )),
+    )
 
-    private fun buildMenu(menu: Menu) {
-        menu.clear()
-        actions.clear()
-        menuEntries.clear()
-        menuPrefix = ""
-        menuEntries += s(R.string.undo) to { board.undo() }
-        menuEntries += s(R.string.redo) to { board.redo() }
-        menuEntries += s(R.string.add_images) to { pickMedia(REQ_ADD, multiple = true) }
-        menuEntries += s(R.string.focus_mode) to { setFocusMode(!focusMode) }
-        menu.act(s(R.string.command_palette)) { palette() }
-        menu.act(s(R.string.paste)) { paste() }
-        menu.act(s(R.string.add_note)) { noteEditor(null) }
-        menu.act(s(R.string.draw)) { board.startDrawing() }
-        menu.act(s(R.string.select_all)) { board.selectAll() }
-        menu.act(s(R.string.hierarchy)) { hierarchy() }
-        menu.act(s(R.string.slideshow)) { board.startSlideshow() }
-        menu.act(s(R.string.always_on_top)) { alwaysOnTop() }
-        menu.addSubMenu(s(R.string.file)).apply {
-            menuPrefix = s(R.string.file) + " › "
-            act(s(R.string.new_scene)) { switchTo(Scene.create(this@MainActivity, s(R.string.untitled))) }
-            act(s(R.string.open_pur)) { openPur() }
-            act(s(R.string.save)) { save() }
-            act(s(R.string.save_as)) { saveAs() }
-            act(s(R.string.my_scenes)) { openScene() }
-            act(s(R.string.rename)) { editText(s(R.string.scene_name), board.scene.name) { board.scene.name = it; board.scene.save(); title = it; titleView.text = it } }
-            act(s(R.string.duplicate_scene)) { board.scene.save(); switchTo(board.scene.copy(this@MainActivity, s(R.string.copy_of, board.scene.name))) }
-            act(s(R.string.delete_scene)) { deleteScene() }
-        }
-        menu.addSubMenu(s(R.string.export)).apply {
-            menuPrefix = s(R.string.export) + " › "
-            act(s(R.string.export_png)) { exportItems = board.scene.items.toList(); create(REQ_PNG, "image/png", "${board.scene.name}.png") }
-            act(s(R.string.export_images)) { exportItems = board.ordered(); exportFiles() }
-        }
-        menu.addSubMenu(s(R.string.view)).apply {
-            menuPrefix = s(R.string.view) + " › "
-            act(s(R.string.focus_canvas)) { board.focusAll() }
-            act(s(R.string.reset_zoom)) { board.resetZoom() }
-            act(s(R.string.reset_camera)) { board.resetCamera() }
-            act(s(R.string.picker), checked = board.picking) { setPicking(!board.picking) }
-            act(s(R.string.grayscale_canvas), checked = Prefs.canvasGray) { Prefs.canvasGray = !Prefs.canvasGray; board.invalidate() }
-        }
-        menu.addSubMenu(s(R.string.canvas)).apply {
-            menuPrefix = s(R.string.canvas) + " › "
-            act(s(R.string.grid_dots), checked = Prefs.grid == 2) { Prefs.grid = 2; board.invalidate() }
-            act(s(R.string.grid_lines), checked = Prefs.grid == 1) { Prefs.grid = 1; board.invalidate() }
-            act(s(R.string.grid_none), checked = Prefs.grid == 0) { Prefs.grid = 0; board.invalidate() }
-            act(s(R.string.snap), checked = Prefs.snap) { Prefs.snap = !Prefs.snap }
-            act(s(R.string.lock_canvas), checked = Prefs.canvasLocked) { toggleCanvasLock() }
-            act(s(R.string.arrange_all)) { board.clearSelection(); board.arrange("optimal") }
-        }
-        menuPrefix = ""
-        menu.act(s(R.string.settings)) { showSettings() }
-        menu.act(s(R.string.about)) { about() }
-    }
+    private fun mainSheet() = sheet(board.scene.name, mainSections(), light, listOf(
+        Triple(R.drawable.ic_command, s(R.string.command_palette)) { palette() },
+        Triple(R.drawable.ic_settings, s(R.string.settings)) { showSettings() },
+        Triple(R.drawable.ic_info, s(R.string.about)) { about() },
+    ))
 
     private fun toggleCanvasLock() {
         Prefs.canvasLocked = !Prefs.canvasLocked
         toast(s(if (Prefs.canvasLocked) R.string.canvas_locked else R.string.canvas_unlocked))
     }
 
-    // ---- the bottom bar: whatever fits the current mode or selection
+    // ---- the toolbar: a pill of icon buttons for what's selected or the current mode
 
-    private fun compact(label: String, f: () -> Unit) = Button(this, null, android.R.attr.borderlessButtonStyle).apply {
-        text = label
-        setTextColor(chipFg)
-        isAllCaps = false
-        minWidth = 0
-        minimumWidth = 0 // the button style sets both
-        val p = (12 * resources.displayMetrics.density).toInt()
-        setPadding(p, paddingTop, p, paddingBottom)
-        setOnClickListener { f() }
-    }
-
-    private fun button(label: String, f: () -> Unit) {
-        bar.addView(compact(label, f))
-        barEntries += label to f
+    private fun barIcon(iconId: Int, desc: String, selected: Boolean = false, swatch: Int? = null, f: () -> Unit) {
+        bar.addView(ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER
+            tip(this, desc)
+            when {
+                swatch != null -> setImageDrawable(GradientDrawable().apply { shape = GradientDrawable.OVAL; setSize(px(22), px(22)); setColor(swatch); setStroke(px(2), chipFg) })
+                else -> setImageDrawable(ic(iconId, if (selected) Palette.BLUE else chipFg))
+            }
+            background = if (selected) GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor((Palette.BLUE and 0xFFFFFF) or 0x33000000) }
+            else obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackgroundBorderless)).run { getDrawable(0).also { recycle() } }
+            setOnClickListener { f() }
+        }, LinearLayout.LayoutParams(px(46), px(46)).apply { setMargins(px(1), 0, px(1), 0) })
     }
 
     /** Text in the bar that isn't a command (frame number, slide count). */
-    private fun label(text: String) = bar.addView(compact(text) {}.apply { isEnabled = false })
+    private fun label(text: String) = bar.addView(TextView(this).apply {
+        this.text = text
+        setTextColor(chipFg)
+        textSize = 13f
+        setPadding(px(8), 0, px(8), 0)
+    })
 
     override fun selectionChanged() {
         bar.removeAllViews()
-        barEntries.clear()
         when {
             board.drawing -> drawBar()
             board.slides.isNotEmpty() -> slideBar()
-            board.cropId >= 0 -> { button(s(R.string.done)) { board.endCrop() }; button(s(R.string.reset_crop)) { board.resetCrop() } }
+            board.cropId >= 0 -> {
+                barIcon(R.drawable.ic_check, s(R.string.done)) { board.endCrop() }
+                barIcon(R.drawable.ic_rotate_ccw, s(R.string.reset_crop)) { board.resetCrop() }
+            }
             board.selection.isNotEmpty() -> selectionBar()
         }
         // a selected item's comment shows at the top, like PureRef's comment popup
         val comment = board.selected().singleOrNull()?.comment.orEmpty()
         if (!board.picking) {
             info.visibility = if (comment.isEmpty()) View.GONE else View.VISIBLE
-            info.text = "💬 $comment"
+            info.text = comment
+            info.setCompoundDrawablesRelative(ic(R.drawable.ic_message_square, Color.WHITE).apply { setBounds(0, 0, px(18), px(18)) }, null, null, null)
+            info.compoundDrawablePadding = px(8)
         }
-        barScroll.scrollTo(0, 0)
-        barScroll.visibility = if (bar.childCount > 0) View.VISIBLE else View.GONE
+        bar.visibility = if (bar.childCount > 0) View.VISIBLE else View.GONE
         addBtn.visibility = if (bar.childCount > 0 || focusMode) View.GONE else View.VISIBLE
     }
 
+    private val tools = listOf(
+        Triple(T_PEN, R.drawable.ic_pen_line, R.string.pen), Triple(T_LINE, R.drawable.ic_minus, R.string.line),
+        Triple(T_RECT, R.drawable.ic_square, R.string.rectangle), Triple(T_ELLIPSE, R.drawable.ic_circle, R.string.ellipse),
+        Triple(T_ERASER, R.drawable.ic_eraser, R.string.eraser),
+    )
+
     private fun drawBar() {
-        button(s(R.string.done)) { board.stopDrawing() }
-        button("↶") { board.undo() }
-        listOf(T_PEN to R.string.pen, T_LINE to R.string.line, T_RECT to R.string.rectangle, T_ELLIPSE to R.string.ellipse, T_ERASER to R.string.eraser)
-            .forEach { (t, l) -> button((if (Prefs.penTool == t) "● " else "") + s(l)) { Prefs.penTool = t; selectionChanged() } }
-        button(s(R.string.color)) { pickColor(s(R.string.color), withNone = false) { Prefs.penColor = it } }
-        button(s(R.string.width)) {
-            choose(s(R.string.width), listOf(s(R.string.small), s(R.string.medium), s(R.string.large))) { Prefs.penWidth = intArrayOf(2, 4, 10)[it] }
-        }
-        button(s(R.string.style)) {
-            choose(s(R.string.style), listOf(s(R.string.solid), s(R.string.dotted), s(R.string.arrow))) { Prefs.penStyle = it }
+        barIcon(R.drawable.ic_check, s(R.string.done)) { board.stopDrawing() }
+        barIcon(R.drawable.ic_undo_2, s(R.string.undo)) { board.undo() }
+        for ((t, icon, name) in tools) barIcon(icon, s(name), selected = Prefs.penTool == t) { Prefs.penTool = t; selectionChanged() }
+        barIcon(0, s(R.string.color), swatch = Prefs.penColor) { pickColor(s(R.string.color), withNone = false, current = Prefs.penColor) { Prefs.penColor = it; selectionChanged() } }
+        barIcon(R.drawable.ic_spline, s(R.string.style)) {
+            sheet(s(R.string.style), listOf(
+                Section(s(R.string.width), Palette.BLUE, listOf(2 to R.string.small, 4 to R.string.medium, 10 to R.string.large).map { (w, n) ->
+                    Tile(R.drawable.ic_minus, s(n), Prefs.penWidth == w) { Prefs.penWidth = w }
+                }),
+                Section(s(R.string.style), Palette.PURPLE, listOf(
+                    Tile(R.drawable.ic_minus, s(R.string.solid), Prefs.penStyle == S_SOLID) { Prefs.penStyle = S_SOLID },
+                    Tile(R.drawable.ic_ellipsis, s(R.string.dotted), Prefs.penStyle == S_DOTTED) { Prefs.penStyle = S_DOTTED },
+                    Tile(R.drawable.ic_arrow_left_right, s(R.string.arrow), Prefs.penStyle == S_ARROW) { Prefs.penStyle = S_ARROW },
+                )),
+            ), light)
         }
     }
 
     private fun slideBar() {
-        button("⏮") { board.slideStep(-1) }
-        button(s(if (board.slidePaused) R.string.play else R.string.pause)) { board.toggleSlidePause() }
-        button("⏭") { board.slideStep(1) }
+        barIcon(R.drawable.ic_skip_back, s(R.string.prev)) { board.slideStep(-1) }
+        if (board.slidePaused) barIcon(R.drawable.ic_play, s(R.string.play)) { board.toggleSlidePause() }
+        else barIcon(R.drawable.ic_pause, s(R.string.pause)) { board.toggleSlidePause() }
+        barIcon(R.drawable.ic_skip_forward, s(R.string.next)) { board.slideStep(1) }
         label("${board.slideIndex + 1} / ${board.slides.size}")
-        button(s(R.string.stop)) { board.stopSlideshow() }
+        barIcon(R.drawable.ic_circle_stop, s(R.string.stop)) { board.stopSlideshow() }
     }
 
+    /** At most a handful of icons: the obvious actions for what's selected, then "more" and delete. */
     private fun selectionBar() {
         val sel = board.selected()
         val one = sel.singleOrNull()
-        val groups = sel.any { it.type == GROUP }
+        when {
+            one?.type == NOTE -> {
+                barIcon(R.drawable.ic_pencil, s(R.string.edit)) { noteEditor(one) }
+                barIcon(R.drawable.ic_palette, s(R.string.colors)) { noteColors() }
+            }
+            one?.type == DRAW -> barIcon(R.drawable.ic_pencil, s(R.string.edit)) { board.startDrawing(one) }
+            one?.type == GIF -> board.gifOf(one)?.let { gif ->
+                if (gif.playing) barIcon(R.drawable.ic_pause, s(R.string.pause)) { gif.playing = false; board.invalidate(); selectionChanged() }
+                else barIcon(R.drawable.ic_play, s(R.string.play)) { gif.playing = true; board.invalidate(); selectionChanged() }
+                barIcon(R.drawable.ic_step_back, s(R.string.frame)) { gif.step(-1); board.invalidate(); selectionChanged() }
+                if (!gif.playing) label("${gif.frame() + 1}/${gif.frames}")
+                barIcon(R.drawable.ic_step_forward, s(R.string.frame)) { gif.step(1); board.invalidate(); selectionChanged() }
+            }
+            one?.type == VIDEO -> board.vidOf(one)?.let { vid ->
+                if (vid.playing) barIcon(R.drawable.ic_pause, s(R.string.pause)) { vid.playing = false; selectionChanged() }
+                else barIcon(R.drawable.ic_play, s(R.string.play)) { vid.playing = true; selectionChanged() }
+                barIcon(R.drawable.ic_repeat, s(R.string.loop)) { loopEditor(one, vid) }
+            }
+            one?.type == GROUP -> {
+                barIcon(if (one.closed) R.drawable.ic_lock_open else R.drawable.ic_lock, s(if (one.closed) R.string.unlock_group else R.string.lock_group)) {
+                    board.edit { if (it.type == GROUP) it.copy(closed = !one.closed) else it }
+                }
+                barIcon(R.drawable.ic_ungroup, s(R.string.ungroup)) { board.ungroup() }
+            }
+            one?.isMedia == true -> {
+                barIcon(R.drawable.ic_crop, s(R.string.crop)) { board.startCrop() }
+                barIcon(R.drawable.ic_square_split_horizontal, s(R.string.flip_h)) { board.edit { it.copy(flipX = !it.flipX) } }
+            }
+            sel.size > 1 -> {
+                barIcon(R.drawable.ic_layout_dashboard, s(R.string.arrange)) { board.arrange("optimal") }
+                barIcon(R.drawable.ic_group, s(R.string.group)) { board.group(s(R.string.group)) }
+            }
+        }
+        barIcon(R.drawable.ic_copy, s(R.string.duplicate)) { board.duplicate() }
+        barIcon(R.drawable.ic_ellipsis, s(R.string.more)) { moreSheet() }
+        barIcon(R.drawable.ic_trash, s(R.string.delete)) { board.delete() }
+    }
+
+    /** Everything that can be done to the selection, grouped: what PureRef has in its right-click menu. */
+    private fun moreSections(): List<Section> {
+        val sel = board.selected()
+        val one = sel.singleOrNull()
+        val media = sel.any { it.isMedia }
+        val many = sel.size > 1 || sel.any { it.type == GROUP }
+        val out = ArrayList<Section>()
+        val special = ArrayList<Tile>()
         when (one?.type) {
             NOTE -> {
-                button(s(R.string.edit)) { noteEditor(one) }
-                button(s(R.string.colors)) { noteColors() }
-                button(s(R.string.note_width)) {
-                    val widths = floatArrayOf(0f, 240f, 480f, 800f)
-                    choose(s(R.string.note_width), listOf(s(R.string.auto_size), s(R.string.narrow), s(R.string.medium), s(R.string.wide))) { i ->
-                        board.edit { if (it.type == NOTE) it.copy(noteWidth = widths[i]).withText(it.text) else it }
-                    }
-                }
+                special += Tile(R.drawable.ic_pencil, s(R.string.edit)) { noteEditor(one) }
+                special += Tile(R.drawable.ic_palette, s(R.string.colors)) { noteColors() }
+                val widths = listOf(0f to R.string.auto_size, 240f to R.string.narrow, 480f to R.string.medium, 800f to R.string.wide)
+                special += widths.map { (w, n) -> Tile(R.drawable.ic_move_horizontal, s(n), one.noteWidth == w) { board.edit { if (it.type == NOTE) it.copy(noteWidth = w).withText(it.text) else it } } }
             }
-            DRAW -> button(s(R.string.edit)) { board.startDrawing(one) }
             GIF -> board.gifOf(one)?.let { gif ->
-                button(s(if (gif.playing) R.string.pause else R.string.play)) { gif.playing = !gif.playing; board.invalidate(); selectionChanged() }
-                if (!gif.playing) label("${gif.frame() + 1} / ${gif.frames}")
-                button("◀ ${s(R.string.frame)}") { gif.step(-1); board.invalidate(); selectionChanged() }
-                button("${s(R.string.frame)} ▶") { gif.step(1); board.invalidate(); selectionChanged() }
-                button(s(R.string.speed)) { speed { gif.speed = it } }
-                button(s(R.string.scrub)) { scrub(gif.time.toFloat() / gif.duration) { f -> gif.playing = false; gif.seek(f); board.invalidate() } }
-                button(s(R.string.frame_to_image)) { board.frameToImage(one) }
+                special += Tile(R.drawable.ic_gauge, s(R.string.speed)) { speed { gif.speed = it } }
+                special += Tile(R.drawable.ic_sliders_horizontal, s(R.string.scrub)) { scrub(gif.time.toFloat() / gif.duration) { f -> gif.playing = false; gif.seek(f); board.invalidate() } }
+                special += Tile(R.drawable.ic_image_plus, s(R.string.frame_to_image)) { board.frameToImage(one) }
             }
             VIDEO -> board.vidOf(one)?.let { vid ->
-                button(s(if (vid.playing) R.string.pause else R.string.play)) { vid.playing = !vid.playing; selectionChanged() }
-                button(s(R.string.speed)) { speed { vid.speed = it } }
-                button(s(R.string.loop)) { loopEditor(one, vid) }
-                button(s(R.string.frame_to_image)) { board.frameToImage(one) }
+                special += Tile(R.drawable.ic_gauge, s(R.string.speed)) { speed { vid.speed = it } }
+                special += Tile(R.drawable.ic_repeat, s(R.string.loop)) { loopEditor(one, vid) }
+                special += Tile(R.drawable.ic_image_plus, s(R.string.frame_to_image)) { board.frameToImage(one) }
+            }
+            GROUP -> {
+                special += Tile(R.drawable.ic_paint_bucket, s(R.string.group_color)) { pickColor(s(R.string.group_color), withNone = true, current = one.bgColor) { c -> board.edit { if (it.type == GROUP) it.copy(bgColor = c) else it } } }
+                special += Tile(R.drawable.ic_ungroup, s(R.string.ungroup)) { board.ungroup() }
             }
         }
-        if (groups) {
-            button(s(R.string.ungroup)) { board.ungroup() }
-            button(s(R.string.group_color)) { pickColor(s(R.string.group_color), withNone = true) { c -> board.edit { if (it.type == GROUP) it.copy(bgColor = c) else it } } }
-            val closed = sel.filter { it.type == GROUP }.all { it.closed }
-            button(s(if (closed) R.string.unlock_group else R.string.lock_group)) { board.edit { if (it.type == GROUP) it.copy(closed = !closed) else it } }
+        if (special.isNotEmpty()) out += Section(label(one!!), Palette.PINK, special)
+        out += Section(s(R.string.transform), Palette.BLUE, listOfNotNull(
+            if (one?.isMedia == true) Tile(R.drawable.ic_crop, s(R.string.crop)) { board.startCrop() } else null,
+            if (media) Tile(R.drawable.ic_rotate_ccw, s(R.string.reset_crop)) { board.resetCrop() } else null,
+            Tile(R.drawable.ic_square_split_horizontal, s(R.string.flip_h)) { board.edit { it.copy(flipX = !it.flipX) } },
+            Tile(R.drawable.ic_square_split_vertical, s(R.string.flip_v)) { board.edit { it.copy(flipY = !it.flipY) } },
+            Tile(R.drawable.ic_rotate_ccw, s(R.string.reset)) { board.edit { it.copy(scale = 1f, rot = 0f, flipX = false, flipY = false) } },
+            Tile(R.drawable.ic_contrast, s(R.string.gray), sel.all { it.gray }) { board.edit { it.copy(gray = !it.gray) } },
+            Tile(R.drawable.ic_blend, s(R.string.opacity)) { opacity() },
+            if (media) sel.filter { it.isMedia }.all { it.nearest }.let { px -> Tile(R.drawable.ic_grid_2x2, s(R.string.pixelated), px) { board.edit { if (it.isMedia) it.copy(nearest = !px) else it } } } else null,
+            Tile(R.drawable.ic_crosshair, s(R.string.focus)) { board.focus(board.selected()) },
+        ))
+        out += Section(s(R.string.arrange), Palette.GREEN, listOf(
+            Tile(R.drawable.ic_layout_dashboard, s(R.string.optimal)) { board.arrange("optimal") },
+            Tile(R.drawable.ic_arrow_down_a_z, s(R.string.by_name)) { board.arrange("name") },
+            Tile(R.drawable.ic_clock, s(R.string.by_addition)) { board.arrange("addition") },
+            Tile(R.drawable.ic_list_ordered, s(R.string.by_order)) { board.arrange("order") },
+            Tile(R.drawable.ic_folder_tree, s(R.string.by_path)) { board.arrange("path") },
+            Tile(R.drawable.ic_shuffle, s(R.string.randomly)) { board.arrange("random") },
+        ))
+        if (many) {
+            out += Section(s(R.string.align), Palette.TEAL, listOf(
+                Tile(R.drawable.ic_align_horizontal_justify_start, s(R.string.left)) { board.align(0) },
+                Tile(R.drawable.ic_align_horizontal_justify_end, s(R.string.right)) { board.align(1) },
+                Tile(R.drawable.ic_align_vertical_justify_start, s(R.string.top)) { board.align(2) },
+                Tile(R.drawable.ic_align_vertical_justify_end, s(R.string.bottom)) { board.align(3) },
+                Tile(R.drawable.ic_align_horizontal_space_between, s(R.string.distribute_h)) { board.distribute(true) },
+                Tile(R.drawable.ic_align_vertical_space_between, s(R.string.distribute_v)) { board.distribute(false) },
+                Tile(R.drawable.ic_layers, s(R.string.stack)) { board.stack() },
+            ))
+            out += Section(s(R.string.normalize), Palette.YELLOW, listOf(
+                Tile(R.drawable.ic_move_vertical, s(R.string.n_height)) { board.normalize("height") },
+                Tile(R.drawable.ic_move_horizontal, s(R.string.n_width)) { board.normalize("width") },
+                Tile(R.drawable.ic_maximize_2, s(R.string.n_size)) { board.normalize("size") },
+                Tile(R.drawable.ic_square, s(R.string.n_area)) { board.normalize("area") },
+                Tile(R.drawable.ic_scaling, s(R.string.n_scale)) { board.normalize("scale") },
+                Tile(R.drawable.ic_arrow_left_right, s(if (Prefs.normalizeFirst) R.string.source_first else R.string.source_average), Prefs.normalizeFirst) {
+                    Prefs.normalizeFirst = !Prefs.normalizeFirst; moreSheet()
+                },
+            ))
         }
-        button("⟨") { board.focusStep(-1) }
-        button(s(R.string.focus)) { board.focus(board.selected()) }
-        button("⟩") { board.focusStep(1) }
-        if (one?.isMedia == true) button(s(R.string.crop)) { board.startCrop() }
-        button(s(R.string.flip_h)) { board.edit { it.copy(flipX = !it.flipX) } }
-        button(s(R.string.flip_v)) { board.edit { it.copy(flipY = !it.flipY) } }
-        button(s(R.string.gray)) { board.edit { it.copy(gray = !it.gray) } }
-        button(s(R.string.opacity)) { opacity() }
-        button(s(R.string.arrange)) { arrangeMenu() }
-        if (sel.size > 1 || groups) {
-            button(s(R.string.align)) { choose(s(R.string.align), listOf(s(R.string.left), s(R.string.right), s(R.string.top), s(R.string.bottom))) { board.align(it) } }
-            button(s(R.string.normalize)) { normalizeMenu() }
-        }
-        button(s(R.string.group)) { board.group(s(R.string.group)) }
-        if (sel.size > 1) button(s(R.string.parent)) { board.parentToFirst() }
-        button(s(R.string.front)) { board.toFront() }
-        button(s(R.string.back)) { board.toBack() }
-        button(s(R.string.duplicate)) { board.duplicate() }
-        button(s(R.string.lock)) { board.toggleLock() }
-        button(s(R.string.more)) { moreMenu(sel) }
-        button(s(R.string.delete)) { board.delete() }
+        out += Section(s(R.string.layers), Palette.PURPLE, listOfNotNull(
+            Tile(R.drawable.ic_bring_to_front, s(R.string.front)) { board.toFront() },
+            Tile(R.drawable.ic_send_to_back, s(R.string.back)) { board.toBack() },
+            Tile(R.drawable.ic_group, s(R.string.group)) { board.group(s(R.string.group)) },
+            if (sel.any { it.type == GROUP }) Tile(R.drawable.ic_ungroup, s(R.string.ungroup)) { board.ungroup() } else null,
+            if (sel.size > 1) Tile(R.drawable.ic_link, s(R.string.parent)) { board.parentToFirst() } else null,
+            if (sel.any { it.parent != 0L }) Tile(R.drawable.ic_unlink, s(R.string.unparent)) { board.edit { it.copy(parent = 0) } } else null,
+            Tile(R.drawable.ic_lock, s(R.string.lock)) { board.toggleLock() },
+        ))
+        out += Section(s(R.string.item_section), Palette.ORANGE, listOfNotNull(
+            if (one != null) Tile(R.drawable.ic_text_cursor_input, s(R.string.rename)) { editText(s(R.string.name), one.name) { board.rename(one, it) } } else null,
+            if (one != null) Tile(R.drawable.ic_message_square, s(R.string.comment), one.comment.isNotEmpty()) {
+                editText(s(R.string.comment), one.comment, allowEmpty = true) { c -> board.apply(listOf(one.copy(comment = c.trim()))) }
+            } else null,
+            if (one?.type == IMAGE || one?.type == GIF) Tile(R.drawable.ic_replace, s(R.string.replace)) { pickImages(REQ_REPLACE) } else null,
+            if (one != null && one.source.startsWith("http")) Tile(R.drawable.ic_external_link, s(R.string.source)) { open(one.source) } else null,
+            Tile(R.drawable.ic_copy, s(R.string.copy)) { copyItems() },
+            Tile(R.drawable.ic_scissors, s(R.string.cut)) { if (board.copySelection()) { markClipboard(); board.delete() } },
+            Tile(R.drawable.ic_presentation, s(R.string.slideshow)) { board.startSlideshow() },
+            Tile(R.drawable.ic_image_down, s(R.string.as_one_png)) { exportItems = selectionWithChildren(); create(REQ_PNG, "image/png", "${board.scene.name}.png") },
+            Tile(R.drawable.ic_images, s(R.string.as_separate)) { exportItems = selectionWithChildren(); exportFiles() },
+            Tile(R.drawable.ic_trash, s(R.string.delete), color = Palette.RED) { board.delete() },
+        ))
+        return out
     }
 
-    private fun moreMenu(sel: List<Item>) {
-        val one = sel.singleOrNull()
-        val entries = ArrayList<Pair<String, () -> Unit>>()
-        entries += s(R.string.reset) to { board.edit { it.copy(scale = 1f, rot = 0f, flipX = false, flipY = false) } }
-        if (sel.any { it.isMedia }) {
-            entries += s(R.string.reset_crop) to { board.resetCrop() }
-            val v = !sel.filter { it.isMedia }.all { it.nearest }
-            entries += s(if (v) R.string.pixelated else R.string.smooth) to { board.edit { if (it.isMedia) it.copy(nearest = v) else it } }
-        }
-        if (one?.type == IMAGE || one?.type == GIF) entries += s(R.string.replace) to { pickImages(REQ_REPLACE) }
-        if (one != null && one.source.startsWith("http")) entries += s(R.string.source) to { open(one.source) }
-        if (one != null) entries += s(R.string.rename) to { editText(s(R.string.name), one.name) { board.rename(one, it) } }
-        if (one != null) entries += s(R.string.comment) to {
-            editText(s(R.string.comment), one.comment, allowEmpty = true) { c -> board.apply(listOf(one.copy(comment = c.trim()))) }
-        }
-        entries += s(R.string.copy) to { copyItems() }
-        entries += s(R.string.cut) to { if (board.copySelection()) { markClipboard(); board.delete() } }
-        if (sel.any { it.parent != 0L }) entries += s(R.string.unparent) to { board.edit { it.copy(parent = 0) } }
-        entries += s(R.string.slideshow) to { board.startSlideshow() }
-        entries += s(R.string.export) to {
-            exportItems = sel.flatMap { s0 -> board.scene.items.filter { it.id in board.withDescendants(listOf(s0.id)) } }.distinctBy { it.id }
-            choose(s(R.string.export), listOf(s(R.string.as_one_png), s(R.string.as_separate))) {
-                if (it == 0) create(REQ_PNG, "image/png", "${board.scene.name}.png") else exportFiles()
-            }
-        }
-        choose(s(R.string.more), entries.map { it.first }) { entries[it].second() }
-    }
+    private fun selectionWithChildren() = board.withDescendants(board.selection).let { ids -> board.scene.items.filter { it.id in ids } }
 
-    private fun arrangeMenu() = choose(
-        s(R.string.arrange),
-        listOf(R.string.optimal, R.string.by_name, R.string.by_addition, R.string.by_order, R.string.by_path, R.string.randomly,
-            R.string.stack, R.string.distribute_h, R.string.distribute_v).map { s(it) },
-    ) {
-        when (it) {
-            0 -> board.arrange("optimal"); 1 -> board.arrange("name"); 2 -> board.arrange("addition")
-            3 -> board.arrange("order"); 4 -> board.arrange("path"); 5 -> board.arrange("random")
-            6 -> board.stack(); 7 -> board.distribute(true); else -> board.distribute(false)
-        }
-    }
-
-    private fun normalizeMenu() {
-        val kinds = listOf("height", "width", "size", "area", "scale")
-        val labels = listOf(R.string.n_height, R.string.n_width, R.string.n_size, R.string.n_area, R.string.n_scale).map { s(it) } +
-            s(if (Prefs.normalizeFirst) R.string.source_first else R.string.source_average)
-        choose(s(R.string.normalize), labels) {
-            if (it < kinds.size) board.normalize(kinds[it]) else { Prefs.normalizeFirst = !Prefs.normalizeFirst; normalizeMenu() }
-        }
-    }
+    private fun moreSheet() = sheet(s(R.string.more), moreSections(), light)
 
     // ---- notes
 
@@ -540,7 +570,13 @@ class MainActivity : Activity(), BoardView.Host {
             Triple(R.string.white_no_bg, 0xFFFFFFFF.toInt(), 0),
             Triple(R.string.black_no_bg, 0xFF000000.toInt(), 0),
         )
-        choose(s(R.string.colors), presets.map { s(it.first) }) { i -> board.edit { it.copy(textColor = presets[i].second, bgColor = presets[i].third) } }
+        val cur = board.selected().firstOrNull()
+        sheet(s(R.string.colors), listOf(Section(s(R.string.colors), Palette.PINK, presets.map { (n, fg, bgc) ->
+            // the swatch shows the background, or the text color when there's none
+            Tile(0, s(n), cur?.textColor == fg && cur.bgColor == bgc, swatch = if (bgc != 0) bgc or 0xFF000000.toInt() else fg) {
+                board.edit { it.copy(textColor = fg, bgColor = bgc) }
+            }
+        })), light)
     }
 
     /** Rich-text note editor: bold, italic, underline, strike, size, color, highlight, font, alignment, bullets, checklists, links. */
@@ -552,34 +588,41 @@ class MainActivity : Activity(), BoardView.Host {
             gravity = Gravity.TOP or Gravity.START
             setSelection(text.length)
         }
-        val tools = LinearLayout(this)
-        fun tool(label: String, f: (Editable, Int, Int) -> Unit) =
-            tools.addView(compact(label) { f(et.text, min(et.selectionStart, et.selectionEnd), max(et.selectionStart, et.selectionEnd)) })
-        tool("B") { e, a, b -> toggleSpan(e, a, b, "b") }
-        tool("I") { e, a, b -> toggleSpan(e, a, b, "i") }
-        tool("U") { e, a, b -> toggleSpan(e, a, b, "u") }
-        tool("S̶") { e, a, b -> toggleSpan(e, a, b, "s") }
-        tool("A+") { e, a, b -> resize(e, a, b, 1.25f) }
-        tool("A−") { e, a, b -> resize(e, a, b, 0.8f) }
-        tool(s(R.string.color)) { e, a, b -> pickColor(s(R.string.color), false) { c -> setSpan(e, a, b, "fg", c.toString()) } }
-        tool(s(R.string.highlight)) { e, a, b -> pickColor(s(R.string.highlight), true) { c -> setSpan(e, a, b, "hl", c.toString()) } }
-        tool(s(R.string.font)) { e, a, b ->
+        // icon buttons on a few rows that wrap to the dialog width, no sideways scrolling
+        val tools = GridLayout(this).apply { columnCount = 7 }
+        fun tool(iconId: Int, desc: Int, f: (Editable, Int, Int) -> Unit) = tools.addView(ImageView(this).apply {
+            setImageDrawable(ic(iconId, textColor))
+            scaleType = ImageView.ScaleType.CENTER
+            tip(this, s(desc))
+            background = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackgroundBorderless)).run { getDrawable(0).also { recycle() } }
+            setOnClickListener { f(et.text, min(et.selectionStart, et.selectionEnd), max(et.selectionStart, et.selectionEnd)) }
+        }, GridLayout.LayoutParams(GridLayout.spec(GridLayout.UNDEFINED), GridLayout.spec(GridLayout.UNDEFINED, 1f)).apply { width = 0; height = px(44) })
+        tool(R.drawable.ic_bold, R.string.bold) { e, a, b -> toggleSpan(e, a, b, "b") }
+        tool(R.drawable.ic_italic, R.string.italic) { e, a, b -> toggleSpan(e, a, b, "i") }
+        tool(R.drawable.ic_underline, R.string.underline) { e, a, b -> toggleSpan(e, a, b, "u") }
+        tool(R.drawable.ic_strikethrough, R.string.strikethrough) { e, a, b -> toggleSpan(e, a, b, "s") }
+        tool(R.drawable.ic_a_arrow_up, R.string.bigger) { e, a, b -> resize(e, a, b, 1.25f) }
+        tool(R.drawable.ic_a_arrow_down, R.string.smaller) { e, a, b -> resize(e, a, b, 0.8f) }
+        tool(R.drawable.ic_type, R.string.font) { e, a, b ->
             val fonts = listOf("sans-serif", "serif", "monospace", "cursive")
             choose(s(R.string.font), fonts) { setSpan(e, a, b, "font", fonts[it]) }
         }
-        tool("⇤") { e, a, b -> paragraphSpan(e, a, b, "align", Layout.Alignment.ALIGN_NORMAL.ordinal.toString()) }
-        tool("↔") { e, a, b -> paragraphSpan(e, a, b, "align", Layout.Alignment.ALIGN_CENTER.ordinal.toString()) }
-        tool("⇥") { e, a, b -> paragraphSpan(e, a, b, "align", Layout.Alignment.ALIGN_OPPOSITE.ordinal.toString()) }
-        tool("•") { e, a, b -> paragraphSpan(e, a, b, "bullet", "") }
-        tool("1.") { e, a, b -> numbered(e, a, b) }
-        tool(Rich.UNCHECKED.toString()) { e, a, b -> checklist(e, a, b) }
-        tool("⇥¶") { e, a, b -> indent(e, a, b, 1) }
-        tool("⇤¶") { e, a, b -> indent(e, a, b, -1) }
-        tool("🔗") { e, a, b -> editText(s(R.string.link), "https://") { setSpan(e, a, b, "url", it) } }
-        tool(s(R.string.clear)) { e, a, b -> clearSpans(e, a, b) }
+        tool(R.drawable.ic_baseline, R.string.color) { e, a, b -> pickColor(s(R.string.color), false) { c -> setSpan(e, a, b, "fg", c.toString()) } }
+        tool(R.drawable.ic_highlighter, R.string.highlight) { e, a, b -> pickColor(s(R.string.highlight), true) { c -> setSpan(e, a, b, "hl", c.toString()) } }
+        tool(R.drawable.ic_text_align_start, R.string.align_start) { e, a, b -> paragraphSpan(e, a, b, "align", Layout.Alignment.ALIGN_NORMAL.ordinal.toString()) }
+        tool(R.drawable.ic_text_align_center, R.string.align_center) { e, a, b -> paragraphSpan(e, a, b, "align", Layout.Alignment.ALIGN_CENTER.ordinal.toString()) }
+        tool(R.drawable.ic_text_align_end, R.string.align_end) { e, a, b -> paragraphSpan(e, a, b, "align", Layout.Alignment.ALIGN_OPPOSITE.ordinal.toString()) }
+        tool(R.drawable.ic_link, R.string.link) { e, a, b -> editText(s(R.string.link), "https://") { setSpan(e, a, b, "url", it) } }
+        tool(R.drawable.ic_remove_formatting, R.string.clear) { e, a, b -> clearSpans(e, a, b) }
+        tool(R.drawable.ic_list, R.string.bullets) { e, a, b -> paragraphSpan(e, a, b, "bullet", "") }
+        tool(R.drawable.ic_list_ordered, R.string.numbered) { e, a, b -> numbered(e, a, b) }
+        tool(R.drawable.ic_list_checks, R.string.checklist) { e, a, b -> checklist(e, a, b) }
+        tool(R.drawable.ic_list_indent_increase, R.string.indent_more) { e, a, b -> indent(e, a, b, 1) }
+        tool(R.drawable.ic_list_indent_decrease, R.string.indent_less) { e, a, b -> indent(e, a, b, -1) }
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(HorizontalScrollView(this@MainActivity).apply { addView(tools) })
+            setPadding(px(12), 0, px(12), 0)
+            addView(tools, LinearLayout.LayoutParams(-1, -2))
             addView(et)
         }
         AlertDialog.Builder(this).setTitle(if (item == null) R.string.add_note else R.string.note).setView(layout)
@@ -687,15 +730,15 @@ class MainActivity : Activity(), BoardView.Host {
         R.string.c_white to 0xFFFFFFFF.toInt(), R.string.c_gray to 0xFF808080.toInt(), R.string.c_black to 0xFF000000.toInt(),
     )
 
-    /** For backgrounds, colors come translucent and "none" is offered. */
-    private fun pickColor(title: String, withNone: Boolean, f: (Int) -> Unit) {
+    /** Color swatches. For backgrounds, colors come translucent and "none" is offered. */
+    private fun pickColor(title: String, withNone: Boolean, current: Int? = null, f: (Int) -> Unit) {
         val list = palette.map { (n, c) -> s(n) to if (withNone) (c and 0xFFFFFF) or 0x50000000 else c } + if (withNone) listOf(s(R.string.c_none) to 0) else emptyList()
-        choose(title, list.map { it.first }) { f(list[it].second) }
+        sheet(title, listOf(Section(title, Palette.PINK, list.map { (n, c) -> Tile(0, n, c == current, swatch = c) { f(c) } })), light)
     }
 
     private fun speed(f: (Float) -> Unit) {
         val v = floatArrayOf(0.25f, 0.5f, 1f, 1.5f, 2f, 4f)
-        choose(s(R.string.speed), v.map { "$it×" }) { f(v[it]) }
+        sheet(s(R.string.speed), listOf(Section(s(R.string.speed), Palette.BLUE, v.map { x -> Tile(R.drawable.ic_gauge, "$x×") { f(x) } })), light)
     }
 
     private fun seekBar(start: Float, f: (Float) -> Unit) = SeekBar(this).apply {
@@ -751,35 +794,33 @@ class MainActivity : Activity(), BoardView.Host {
         }
     }
 
-    private fun icon(it: Item) = when (it.type) { NOTE -> "📝"; GROUP -> "▣"; DRAW -> "✎"; GIF -> "GIF"; VIDEO -> "▶"; else -> "🖼" }
+    private fun typeIcon(it: Item) = when (it.type) {
+        NOTE -> R.drawable.ic_sticky_note; GROUP -> R.drawable.ic_group; DRAW -> R.drawable.ic_pen_line
+        GIF -> R.drawable.ic_image_play; VIDEO -> R.drawable.ic_film; else -> R.drawable.ic_image
+    }
 
     /** Tree of everything in the scene. Tap: select and focus. Long-press: rename, reorder, unparent, lock, delete. */
     private fun hierarchy() {
         val items = board.ordered()
         if (items.isEmpty()) return
-        val labels = items.map {
-            "　".repeat(board.depth(it)) + icon(it) + " " + label(it) + (if (it.locked) " 🔒" else "") + (if (it.comment.isNotEmpty()) " 💬" else "")
-        }
-        val dlg = AlertDialog.Builder(this).setTitle(R.string.hierarchy)
-            .setItems(labels.toTypedArray()) { _, i -> board.select(listOf(items[i])); board.focus(listOf(items[i])) }
-            .create()
-        dlg.show()
+        val dlg = choose(s(R.string.hierarchy), items.map(::label), items.map { ic(typeIcon(it), textColor) },
+            ends = items.map { if (it.locked) ic(R.drawable.ic_lock, textColor) else if (it.comment.isNotEmpty()) ic(R.drawable.ic_message_square, textColor) else null },
+            indent = items.map { board.depth(it) }) { i -> board.select(listOf(items[i])); board.focus(listOf(items[i])) }
         dlg.listView.setOnItemLongClickListener { _, _, i, _ ->
             dlg.dismiss()
             val it = items[i]
-            val acts = listOf<Pair<String, () -> Unit>>(
-                s(R.string.rename) to { editText(s(R.string.name), it.name) { n -> board.rename(it, n) } },
-                s(R.string.move_up) to { board.moveAmongSiblings(it, -1); hierarchy() },
-                s(R.string.move_down) to { board.moveAmongSiblings(it, 1); hierarchy() },
-                s(R.string.parent_to) to {
+            sheet(label(it), listOf(Section(s(R.string.hierarchy), Palette.PURPLE, listOf(
+                Tile(R.drawable.ic_text_cursor_input, s(R.string.rename)) { editText(s(R.string.name), it.name) { n -> board.rename(it, n) } },
+                Tile(R.drawable.ic_bring_to_front, s(R.string.move_up)) { board.moveAmongSiblings(it, -1); hierarchy() },
+                Tile(R.drawable.ic_send_to_back, s(R.string.move_down)) { board.moveAmongSiblings(it, 1); hierarchy() },
+                Tile(R.drawable.ic_link, s(R.string.parent_to)) {
                     val others = items.filter { o -> o.id !in board.withDescendants(listOf(it.id)) }
-                    choose(s(R.string.parent_to), others.map { o -> icon(o) + " " + label(o) }) { j -> board.setParent(it, others[j].id) }
+                    choose(s(R.string.parent_to), others.map(::label), others.map { o -> ic(typeIcon(o), textColor) }) { j -> board.setParent(it, others[j].id) }
                 },
-                s(R.string.unparent) to { board.unparent(it) },
-                s(if (it.locked) R.string.unlock else R.string.lock) to { board.apply(listOf(it.copy(locked = !it.locked))) },
-                s(R.string.delete) to { board.select(listOf(it)); board.delete() },
-            )
-            choose(label(it), acts.map { a -> a.first }) { acts[it].second() }
+                Tile(R.drawable.ic_unlink, s(R.string.unparent)) { board.unparent(it) },
+                Tile(if (it.locked) R.drawable.ic_lock_open else R.drawable.ic_lock, s(if (it.locked) R.string.unlock else R.string.lock)) { board.apply(listOf(it.copy(locked = !it.locked))) },
+                Tile(R.drawable.ic_trash, s(R.string.delete), color = Palette.RED) { board.select(listOf(it)); board.delete() },
+            ))), light)
             true
         }
     }
@@ -793,17 +834,13 @@ class MainActivity : Activity(), BoardView.Host {
     }
 
     override fun canvasMenu() {
-        val acts = listOf<Pair<String, () -> Unit>>(
-            s(R.string.add_images) to { pickMedia(REQ_ADD, multiple = true) },
-            s(R.string.paste) to { paste() },
-            s(R.string.add_note) to { noteEditor(null) },
-            s(R.string.draw) to { board.startDrawing() },
-            s(R.string.select_all) to { board.selectAll() },
-            s(R.string.focus_canvas) to { board.focusAll() },
-            s(R.string.arrange_all) to { board.clearSelection(); board.arrange("optimal") },
-            s(if (Prefs.canvasLocked) R.string.unlock_canvas else R.string.lock_canvas) to { toggleCanvasLock() },
-        )
-        choose(s(R.string.canvas), acts.map { it.first }) { acts[it].second() }
+        val m = mainSections()
+        sheet(s(R.string.canvas), listOf(m[0], Section(s(R.string.board_section), Palette.BLUE, listOf(
+            Tile(R.drawable.ic_scan, s(R.string.select_all)) { board.selectAll() },
+            Tile(R.drawable.ic_maximize, s(R.string.focus_canvas)) { board.focusAll() },
+            Tile(R.drawable.ic_layout_dashboard, s(R.string.arrange_all)) { board.clearSelection(); board.arrange("optimal") },
+            Tile(if (Prefs.canvasLocked) R.drawable.ic_lock_open else R.drawable.ic_lock, s(if (Prefs.canvasLocked) R.string.unlock_canvas else R.string.lock_canvas)) { toggleCanvasLock() },
+        ))), light)
     }
 
     override fun editItem(item: Item) {
@@ -811,6 +848,7 @@ class MainActivity : Activity(), BoardView.Host {
     }
 
     override fun picked(info: String, hex: String) {
+        this.info.setCompoundDrawablesRelative(null, null, null, null)
         this.info.text = info + "\n" + s(R.string.tap_to_copy, hex)
         infoHex = hex
     }
@@ -818,6 +856,8 @@ class MainActivity : Activity(), BoardView.Host {
     private fun setPicking(on: Boolean) {
         board.picking = on
         info.visibility = if (on) View.VISIBLE else View.GONE
+        info.setCompoundDrawablesRelative(ic(R.drawable.ic_pipette, Color.WHITE).apply { setBounds(0, 0, px(18), px(18)) }, null, null, null)
+        info.compoundDrawablePadding = px(8)
         info.text = s(R.string.picker_hint)
     }
 
@@ -1066,31 +1106,31 @@ class MainActivity : Activity(), BoardView.Host {
 
     // ---- settings
 
-    private class Opt(val label: String, val values: List<String>, val get: () -> Int, val set: (Int) -> Unit)
+    private class Opt(val icon: Int, val label: String, val values: List<String>, val get: () -> Int, val set: (Int) -> Unit)
 
     private fun settingsOpts(): List<Opt> {
         val onOff = listOf(s(R.string.off), s(R.string.on))
-        fun flag(label: Int, get: () -> Boolean, set: (Boolean) -> Unit) = Opt(s(label), onOff, { if (get()) 1 else 0 }) { set(it == 1) }
-        fun <T> pick(label: Int, values: List<T>, names: List<String>, get: () -> T, set: (T) -> Unit) =
-            Opt(s(label), names, { values.indexOf(get()).coerceAtLeast(0) }) { set(values[it]) }
+        fun flag(icon: Int, label: Int, get: () -> Boolean, set: (Boolean) -> Unit) = Opt(icon, s(label), onOff, { if (get()) 1 else 0 }) { set(it == 1) }
+        fun <T> pick(icon: Int, label: Int, values: List<T>, names: List<String>, get: () -> T, set: (T) -> Unit) =
+            Opt(icon, s(label), names, { values.indexOf(get()).coerceAtLeast(0) }) { set(values[it]) }
         val langs = listOf("", "en", "fr", "es", "ja", "ko", "zh-CN", "zh-TW")
         val langNames = listOf(s(R.string.lang_system), "English", "Français", "Español", "日本語", "한국어", "简体中文", "繁體中文")
         return listOf(
-            pick(R.string.theme, listOf(0, 1, 2), listOf(s(R.string.theme_dark), s(R.string.theme_light), s(R.string.theme_glass)), { Prefs.theme }) { Prefs.theme = it },
-            pick(R.string.language, langs, langNames, { Prefs.language }) { Prefs.language = it },
-            pick(R.string.undo_size, listOf(50, 200, 500, 1000), listOf("50", "200", "500", "1000"), { Prefs.undoLimit }) { Prefs.undoLimit = it },
-            flag(R.string.pack_new, { Prefs.packNew }) { Prefs.packNew = it },
-            pick(R.string.pack_by, listOf(0, 1, 2), listOf(s(R.string.optimal), s(R.string.by_name), s(R.string.by_addition)), { Prefs.packBy }) { Prefs.packBy = it },
-            flag(R.string.bring_front, { Prefs.bringToFront }) { Prefs.bringToFront = it },
-            flag(R.string.dbl_focus, { Prefs.doubleTapFocus }) { Prefs.doubleTapFocus = it },
-            pick(R.string.borders, listOf(0, 1, 2), listOf(s(R.string.borders_all), s(R.string.borders_selected), s(R.string.off)), { Prefs.borders }) { Prefs.borders = it },
-            pick(R.string.padding, listOf(0, 5, 10, 20, 40), listOf("0", "5", "10", "20", "40"), { Prefs.padding }) { Prefs.padding = it },
-            pick(R.string.sampling, listOf(false, true), listOf(s(R.string.smooth), s(R.string.pixelated)), { Prefs.nearest }) { Prefs.nearest = it },
-            pick(R.string.slide_interval, listOf(3, 5, 10, 20, 30, 60), listOf(3, 5, 10, 20, 30, 60).map { s(R.string.seconds, it) }, { Prefs.slideSeconds }) { Prefs.slideSeconds = it },
-            pick(R.string.slide_order, listOf(0, 1, 2), listOf(s(R.string.ordered), s(R.string.shuffle), s(R.string.randomly)), { Prefs.slideOrder }) { Prefs.slideOrder = it },
-            flag(R.string.drag_groups, { Prefs.dragIntoGroups }) { Prefs.dragIntoGroups = it },
-            flag(R.string.auto_parent, { Prefs.autoParentNotes }) { Prefs.autoParentNotes = it },
-            pick(R.string.quality, listOf(1024, 2048, 4096), listOf("1024 px", "2048 px", "4096 px"), { Prefs.quality }) {
+            pick(R.drawable.ic_sun, R.string.theme, listOf(0, 1, 2), listOf(s(R.string.theme_dark), s(R.string.theme_light), s(R.string.theme_glass)), { Prefs.theme }) { Prefs.theme = it },
+            pick(R.drawable.ic_languages, R.string.language, langs, langNames, { Prefs.language }) { Prefs.language = it },
+            pick(R.drawable.ic_undo_2, R.string.undo_size, listOf(50, 200, 500, 1000), listOf("50", "200", "500", "1000"), { Prefs.undoLimit }) { Prefs.undoLimit = it },
+            flag(R.drawable.ic_layout_dashboard, R.string.pack_new, { Prefs.packNew }) { Prefs.packNew = it },
+            pick(R.drawable.ic_arrow_down_a_z, R.string.pack_by, listOf(0, 1, 2), listOf(s(R.string.optimal), s(R.string.by_name), s(R.string.by_addition)), { Prefs.packBy }) { Prefs.packBy = it },
+            flag(R.drawable.ic_bring_to_front, R.string.bring_front, { Prefs.bringToFront }) { Prefs.bringToFront = it },
+            flag(R.drawable.ic_crosshair, R.string.dbl_focus, { Prefs.doubleTapFocus }) { Prefs.doubleTapFocus = it },
+            pick(R.drawable.ic_square, R.string.borders, listOf(0, 1, 2), listOf(s(R.string.borders_all), s(R.string.borders_selected), s(R.string.off)), { Prefs.borders }) { Prefs.borders = it },
+            pick(R.drawable.ic_move_horizontal, R.string.padding, listOf(0, 5, 10, 20, 40), listOf("0", "5", "10", "20", "40"), { Prefs.padding }) { Prefs.padding = it },
+            pick(R.drawable.ic_grid_2x2, R.string.sampling, listOf(false, true), listOf(s(R.string.smooth), s(R.string.pixelated)), { Prefs.nearest }) { Prefs.nearest = it },
+            pick(R.drawable.ic_clock, R.string.slide_interval, listOf(3, 5, 10, 20, 30, 60), listOf(3, 5, 10, 20, 30, 60).map { s(R.string.seconds, it) }, { Prefs.slideSeconds }) { Prefs.slideSeconds = it },
+            pick(R.drawable.ic_shuffle, R.string.slide_order, listOf(0, 1, 2), listOf(s(R.string.ordered), s(R.string.shuffle), s(R.string.randomly)), { Prefs.slideOrder }) { Prefs.slideOrder = it },
+            flag(R.drawable.ic_group, R.string.drag_groups, { Prefs.dragIntoGroups }) { Prefs.dragIntoGroups = it },
+            flag(R.drawable.ic_link, R.string.auto_parent, { Prefs.autoParentNotes }) { Prefs.autoParentNotes = it },
+            pick(R.drawable.ic_image, R.string.quality, listOf(1024, 2048, 4096), listOf("1024 px", "2048 px", "4096 px"), { Prefs.quality }) {
                 Prefs.quality = it
                 board.setScene(board.scene) // reload images at the new size
             },
@@ -1101,7 +1141,8 @@ class MainActivity : Activity(), BoardView.Host {
     private fun showSettings() {
         val opts = settingsOpts()
         val extra = listOf(s(R.string.export_settings), s(R.string.import_settings))
-        choose(s(R.string.settings), opts.map { "${it.label}: ${it.values[it.get()]}" } + extra) { i ->
+        val icons = opts.map { ic(it.icon, textColor) } + listOf(ic(R.drawable.ic_upload, textColor), ic(R.drawable.ic_download, textColor))
+        choose(s(R.string.settings), opts.map { "${it.label}: ${it.values[it.get()]}" } + extra, icons) { i ->
             when (i - opts.size) {
                 0 -> create(REQ_SETTINGS_OUT, "application/json", "droref-settings.json")
                 1 -> startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE), REQ_SETTINGS_IN)
@@ -1115,14 +1156,15 @@ class MainActivity : Activity(), BoardView.Host {
         if (i <= 1) recreate() else { board.invalidate(); if (reopen) showSettings() } // theme, language need a restart
     }
 
-    /** Search every command: menus, the current bar, settings (PureRef's command palette). */
+    /** Search every command: the main panel, what can be done to the selection, settings (PureRef's command palette). */
     private fun palette() {
-        buildMenu(PopupMenu(this, menuBtn).menu) // fresh labels and checkmarks
         val opts = settingsOpts()
-        val all = (barEntries + menuEntries).distinctBy { it.first } +
-            opts.mapIndexed { i, o -> "${s(R.string.settings)} › ${o.label}" to { editSetting(i, o, reopen = false) } }
+        val sections = mainSections() + if (board.selection.isNotEmpty()) moreSections() else emptyList()
+        val all = sections.flatMap { sec -> sec.tiles.map { t -> Triple(t.icon, "${sec.title} › ${t.label}", t.f) } }.distinctBy { it.second } +
+            listOf(Triple(R.drawable.ic_undo_2, s(R.string.undo), { board.undo() }), Triple(R.drawable.ic_redo_2, s(R.string.redo), { board.redo() })) +
+            opts.mapIndexed { i, o -> Triple(o.icon, "${s(R.string.settings)} › ${o.label}", { editSetting(i, o, reopen = false) }) }
         var shown = all
-        val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_list_item_1, ArrayList(all.map { it.first }))
+        val adapter = iconAdapter(ArrayList(all.map { it.second }), { shown[it].first.takeIf { id -> id != 0 }?.let { id -> ic(id, textColor) } })
         val input = EditText(this).apply { hint = s(R.string.search_hint); isSingleLine = true }
         val list = android.widget.ListView(this).apply { this.adapter = adapter }
         val box = LinearLayout(this).apply {
@@ -1135,15 +1177,15 @@ class MainActivity : Activity(), BoardView.Host {
         input.addTextChangedListener(object : android.text.TextWatcher {
             override fun afterTextChanged(e: Editable) {
                 val q = e.toString().trim().lowercase()
-                shown = all.filter { it.first.lowercase().contains(q) }
+                shown = all.filter { it.second.lowercase().contains(q) }
                 adapter.clear()
-                adapter.addAll(shown.map { it.first })
+                adapter.addAll(shown.map { it.second })
             }
             override fun beforeTextChanged(t: CharSequence, a: Int, b: Int, c: Int) {}
             override fun onTextChanged(t: CharSequence, a: Int, b: Int, c: Int) {}
         })
-        input.setOnEditorActionListener { _, _, _ -> shown.firstOrNull()?.let { dlg.dismiss(); it.second() }; true }
-        list.setOnItemClickListener { _, _, i, _ -> dlg.dismiss(); shown[i].second() }
+        input.setOnEditorActionListener { _, _, _ -> shown.firstOrNull()?.let { dlg.dismiss(); it.third() }; true }
+        list.setOnItemClickListener { _, _, i, _ -> dlg.dismiss(); shown[i].third() }
         dlg.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
         dlg.show()
         input.requestFocus()
@@ -1206,8 +1248,23 @@ class MainActivity : Activity(), BoardView.Host {
 
     // ---- small dialogs
 
-    private fun choose(title: String, items: List<String>, f: (Int) -> Unit) {
-        AlertDialog.Builder(this).setTitle(title).setItems(items.toTypedArray()) { _, w -> f(w) }.show()
+    /** List rows with an icon at the start (and optionally one at the end, and an indent level). */
+    private fun iconAdapter(items: MutableList<String>, start: (Int) -> Drawable?, end: (Int) -> Drawable? = { null }, indent: (Int) -> Int = { 0 }) =
+        object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, items) {
+            override fun getView(pos: Int, convert: View?, parent: ViewGroup): View = (super.getView(pos, convert, parent) as TextView).apply {
+                setCompoundDrawablesRelative(start(pos)?.apply { setBounds(0, 0, px(22), px(22)) }, null, end(pos)?.apply { setBounds(0, 0, px(18), px(18)) }, null)
+                compoundDrawablePadding = px(16)
+                setPaddingRelative(px(24 + indent(pos) * 22), paddingTop, px(24), paddingBottom)
+            }
+        }
+
+    /** A list to pick from; with icons when given. Returns the dialog (the hierarchy adds a long-press). */
+    private fun choose(title: String, items: List<String>, icons: List<Drawable?>? = null, ends: List<Drawable?>? = null,
+                       indent: List<Int>? = null, f: (Int) -> Unit): AlertDialog {
+        val b = AlertDialog.Builder(this).setTitle(title)
+        if (icons == null) b.setItems(items.toTypedArray()) { _, w -> f(w) }
+        else b.setAdapter(iconAdapter(items.toMutableList(), { icons[it] }, { ends?.get(it) }, { indent?.get(it) ?: 0 })) { _, w -> f(w) }
+        return b.show()
     }
 
     private fun editText(title: String, initial: String, allowEmpty: Boolean = false, f: (String) -> Unit) {

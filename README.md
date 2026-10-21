@@ -8,14 +8,15 @@ Boards move between the two as `.pur` files: *File → Open .pur*, *Save*, *Save
 From PureRef 2, save with *Save as → Legacy PureRef scene* first.
 
 ## Using it
-- The canvas fills the screen (dot background by default; grid or plain in ☰ → Canvas). Floating buttons: ☰ menu and scene name top-left, ↶ ↷ and 👁 focus mode top-right, ＋ bottom-right. UI inspired by VizRef.
-- **＋** adds images and videos. You can also paste them, paste a link, use *Share → DroRef*, or **drag and drop** them from another app (gallery, browser, files) in split screen: they land where you drop them.
+- The canvas fills the screen (dot background by default; grid or plain in the menu, under View). Round buttons: menu and scene name top-left, undo, redo and focus mode top-right, add bottom-right.
+- The menu is a panel of icon tiles grouped by purpose (Add, Board, File, View); search, settings and about sit in its header.
+- **Add** images and videos from the gallery, paste them, paste a link, use *Share → DroRef*, or **drag and drop** them from another app (gallery, browser, files) in split screen: they land where you drop them.
 - To drag an image **out** to another app, select it, then long-press it again and drag.
 - Drag empty space to pan, pinch to zoom, double-tap to focus.
 - Tap to select. Drag to move; pinch or twist with two fingers to scale and rotate.
-- Long-press an item to add it to the selection. Long-press empty space and drag to select a rectangle; release without dragging for the canvas menu.
-- The bar at the bottom has what fits the selection: crop, flip, arrange, align, group, GIF/video controls, and *More…*.
-- *Always on top* floats the board over your drawing app. Its bar has opacity, transparent-to-touch (for tracing), no-background (only the images float), and 📌 to show it only over one app (Android asks once for usage access).
+- Long-press an item to add it to the selection. Long-press empty space and drag to select a rectangle; release without dragging for the canvas panel.
+- What's selected gets a short toolbar of icons (long-press one to see its name); "more" opens everything else, grouped: Transform, Arrange, Align, Size, Layers & groups, Item.
+- *Always on top* floats the board over your drawing app. Its bar has opacity, transparent-to-touch (for tracing), background off (only the images float), and a pin to show it only over one app (Android asks once for usage access).
 
 Everything PureRef has, and what's done here: [FEATURES.md](FEATURES.md)
 
@@ -50,6 +51,7 @@ Store listing text and screenshots for F-Droid live in `fastlane/metadata/androi
 ## Credits
 - `.pur` format: ported from [FyorDev/PureRef-format](https://github.com/FyorDev/PureRef-format) (MIT)
 - Video loops idea: [lettucegoblin/AnimRef](https://github.com/lettucegoblin/AnimRef) (MIT)
+- Icons: [Lucide](https://lucide.dev) (ISC, see `third_party/LUCIDE_LICENSE.txt`); `tools/icons.py` converts them
 
 ## License
 MIT

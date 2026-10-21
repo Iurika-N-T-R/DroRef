@@ -33,7 +33,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 ## Navigation & canvas
 - ✅ Pan, pinch zoom, mouse wheel · ✅ double-tap focus (again = back) · ✅ focus canvas · ✅ next / previous
 - ✅ Reset camera / zoom · ✅ lock canvas (Ctrl+R) · ✅ grayscale canvas · ✅ background dots (default) / grid with major lines / plain · ✅ snap to grid
-- ✅ Full-screen canvas with floating buttons and a pill toolbar · ✅ focus mode 👁: UI hidden, look only (from VizRef)
+- ✅ Full-screen canvas with floating icon buttons, a short icon toolbar for the selection, and grouped icon panels instead of long menus · ✅ focus mode (eye button): UI hidden, look only (from VizRef)
 - ✅ Color picker + image coordinates (RGB / HSV / HEX, tap to copy)
 - ✅ Slideshow (Alt+S): interval and order (ordered / shuffle / random) in settings; panning pauses it
 
@@ -63,7 +63,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 ## Window modes
 - ✅ Always on top: a floating window over any app, moved / resized from its bar, its own camera
 - ✅ Overlay mode (background solid / glass / none) · ✅ app opacity (100 / 80 / 60 / 40 %) · ✅ transparent to touch (tracing)
-- ✅ Always on top of… (📌): pick an app, the floating board shows only while that app is in front (uses usage access)
+- ✅ Always on top of… (pin button): pick an app, the floating board shows only while that app is in front (uses usage access)
 - ➖ Always on bottom, lock window, title bar, tray icon, file associations, global shortcuts, SpaceMouse
 
 ## Settings, themes, languages

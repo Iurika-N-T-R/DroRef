@@ -1,0 +1,1 @@
+New look: icons everywhere instead of text and emoji, a grouped icon panel instead of the long menu, settings apart, and a short icon toolbar for the selection.

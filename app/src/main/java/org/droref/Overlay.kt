@@ -19,6 +19,7 @@ import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -36,8 +37,8 @@ class OverlayService : Service(), BoardView.Host {
     private lateinit var bar: LinearLayout
     private lateinit var boardLp: WindowManager.LayoutParams
     private lateinit var barLp: WindowManager.LayoutParams
-    private lateinit var through: TextView
-    private lateinit var pin: TextView
+    private lateinit var through: ImageView
+    private lateinit var pin: ImageView
     private var clickThrough = false
     private var shown = true
     private var type = 0
@@ -75,27 +76,27 @@ class OverlayService : Service(), BoardView.Host {
             gravity = Gravity.TOP or Gravity.START
         }
         bar = LinearLayout(this).apply { setBackgroundColor(0xE0202020.toInt()) }
-        button("✥", getString(R.string.ov_move)) { dx, dy -> boardLp.x += dx; boardLp.y += dy; layout() }
-        button("◐", getString(R.string.opacity), click = {
+        button(R.drawable.ic_move, getString(R.string.ov_move)) { dx, dy -> boardLp.x += dx; boardLp.y += dy; layout() }
+        button(R.drawable.ic_blend, getString(R.string.opacity), click = {
             val steps = floatArrayOf(1f, 0.8f, 0.6f, 0.4f)
             val next = steps[(steps.indexOfFirst { it <= boardLp.alpha + 0.01f } + 1) % steps.size]
             boardLp.alpha = if (clickThrough) minOf(next, MAX_THROUGH_ALPHA) else next
             layout()
         })
-        through = button("☝", getString(R.string.ov_through), click = { setClickThrough(!clickThrough) })
-        button("▣", getString(R.string.ov_background), click = { board.background = (board.background + 1) % 3; Prefs.ovBg = board.background })
-        button("⤡", getString(R.string.ov_resize)) { dx, dy ->
+        through = button(R.drawable.ic_pointer_off, getString(R.string.ov_through), click = { setClickThrough(!clickThrough) })
+        button(R.drawable.ic_layers, getString(R.string.ov_background), click = { board.background = (board.background + 1) % 3; Prefs.ovBg = board.background })
+        button(R.drawable.ic_move_diagonal_2, getString(R.string.ov_resize)) { dx, dy ->
             boardLp.width = (boardLp.width + dx).coerceAtLeast((160 * dp).toInt())
             boardLp.height = (boardLp.height + dy).coerceAtLeast((120 * dp).toInt())
             layout()
         }
-        pin = button("📌", getString(R.string.ov_pin), click = { pickTarget() })
-        button("⛶", getString(R.string.focus_canvas), click = { board.focusAll() })
-        button("⌂", getString(R.string.ov_open_app), click = {
+        pin = button(R.drawable.ic_pin, getString(R.string.ov_pin), click = { pickTarget() })
+        button(R.drawable.ic_maximize, getString(R.string.focus_canvas), click = { board.focusAll() })
+        button(R.drawable.ic_house, getString(R.string.ov_open_app), click = {
             startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             stopSelf()
         })
-        button("✕", getString(R.string.close), click = { stopSelf() })
+        button(R.drawable.ic_x, getString(R.string.close), click = { stopSelf() })
         wm.addView(board, boardLp)
         wm.addView(bar, barLp)
         layout()
@@ -160,14 +161,13 @@ class OverlayService : Service(), BoardView.Host {
     }
 
     @SuppressLint("ClickableViewAccessibility")
-    private fun button(label: String, desc: String, click: (() -> Unit)? = null, drag: ((Int, Int) -> Unit)? = null): TextView {
-        val v = TextView(this).apply {
-            text = label
+    private fun button(icon: Int, desc: String, click: (() -> Unit)? = null, drag: ((Int, Int) -> Unit)? = null): ImageView {
+        val v = ImageView(this).apply {
+            setImageDrawable(getDrawable(icon)!!.mutate().apply { setTint(0xFFFFFFFF.toInt()) })
+            scaleType = ImageView.ScaleType.CENTER
             contentDescription = desc
-            textSize = 18f
-            setTextColor(0xFFFFFFFF.toInt())
-            gravity = Gravity.CENTER
-            minWidth = (36 * dp).toInt() // 9 buttons must fit a 360 dp wide phone
+            if (Build.VERSION.SDK_INT >= 26) tooltipText = desc
+            minimumWidth = (36 * dp).toInt() // 9 buttons must fit a 360 dp wide phone
         }
         if (click != null) v.setOnClickListener { click() }
         if (drag != null) {
@@ -185,7 +185,7 @@ class OverlayService : Service(), BoardView.Host {
         return v
     }
 
-    private fun button(label: String, desc: String, drag: (Int, Int) -> Unit) = button(label, desc, null, drag)
+    private fun button(icon: Int, desc: String, drag: (Int, Int) -> Unit) = button(icon, desc, null, drag)
 
     private fun layout() {
         if (!shown) return
@@ -201,7 +201,7 @@ class OverlayService : Service(), BoardView.Host {
         boardLp.flags = if (on) boardLp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         else boardLp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
         if (on && Build.VERSION.SDK_INT >= 31) boardLp.alpha = minOf(boardLp.alpha, MAX_THROUGH_ALPHA)
-        through.setBackgroundColor(if (on) 0xFF4FA3FF.toInt() else 0) // ☝ is an emoji on most phones, so tint the background
+        through.setBackgroundColor(if (on) 0xFF4FA3FF.toInt() else 0)
         layout()
         Toast.makeText(this, if (on) R.string.ov_through_on else R.string.ov_through_off, Toast.LENGTH_SHORT).show()
     }
