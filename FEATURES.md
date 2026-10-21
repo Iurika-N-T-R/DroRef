@@ -61,7 +61,8 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 ## Window modes
 - ✅ Always on top: a floating window over any app, moved / resized from its bar, its own camera
 - ✅ Overlay mode (background solid / glass / none) · ✅ app opacity (100 / 80 / 60 / 40 %) · ✅ transparent to touch (tracing)
-- ➖ Always on top *of* one app, always on bottom, lock window, title bar, tray icon, file associations, global shortcuts, SpaceMouse
+- ✅ Always on top of… (📌): pick an app, the floating board shows only while that app is in front (uses usage access)
+- ➖ Always on bottom, lock window, title bar, tray icon, file associations, global shortcuts, SpaceMouse
 
 ## Settings, themes, languages
 - ✅ Settings: theme, language, undo size, pack new (and by what), bring to front, double-tap focus, image borders,

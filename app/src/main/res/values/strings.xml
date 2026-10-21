@@ -198,6 +198,10 @@
     <string name="settings_imported">Settings imported</string>
     <string name="export_format">Format for cropped images</string>
     <string name="parent_to">Parent to…</string>
+    <string name="ov_pin">Always on top of…</string>
+    <string name="pin_everywhere">Everywhere (all apps)</string>
+    <string name="usage_access">Allow usage access for DroRef so it can tell which app is open, then tap 📌 again.</string>
+    <string name="pinned_to">Shown only over %1$s</string>
     <string name="on">On</string>
     <string name="off">Off</string>
     <string name="theme">Theme</string>

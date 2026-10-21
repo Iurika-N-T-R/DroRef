@@ -71,6 +71,7 @@ object Prefs {
     var ovH by int("ovH", 900)
     var ovAlpha by float("ovAlpha", 1f)
     var ovBg by int("ovBg", 0)                    // 0 solid, 1 glass, 2 none (overlay mode)
+    var ovTarget by str("ovTarget", "")           // "always on top of" this app's package; "" = everywhere
 
     /** All settings as JSON, for moving them to another device (PureRef 2's settings export). */
     fun exportJson(): String = JSONObject().apply {

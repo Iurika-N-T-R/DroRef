@@ -197,6 +197,10 @@
     <string name="settings_imported">Ajustes importados</string>
     <string name="export_format">Formato de las imágenes recortadas</string>
     <string name="parent_to">Emparentar con…</string>
+    <string name="ov_pin">Siempre visible sobre…</string>
+    <string name="pin_everywhere">En todas partes (todas las apps)</string>
+    <string name="usage_access">Permite el acceso a datos de uso para DroRef, así sabe qué app está abierta, y vuelve a tocar 📌.</string>
+    <string name="pinned_to">Solo se muestra sobre %1$s</string>
     <string name="on">Sí</string>
     <string name="off">No</string>
     <string name="theme">Tema</string>

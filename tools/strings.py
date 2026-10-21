@@ -228,6 +228,11 @@ S = {
 "settings_imported": ["Settings imported", "Réglages importés", "Ajustes importados", "設定を読み込みました", "설정을 가져왔습니다", "设置已导入", "設定已匯入"],
 "export_format": ["Format for cropped images", "Format des images recadrées", "Formato de las imágenes recortadas", "切り抜いた画像の形式", "자른 이미지 형식", "裁剪图片的格式", "裁切圖片的格式"],
 "parent_to": ["Parent to…", "Rattacher à…", "Emparentar con…", "親を指定…", "부모 지정…", "设为子级于…", "設為子層於…"],
+# always on top of
+"ov_pin": ["Always on top of…", "Toujours au premier plan de…", "Siempre visible sobre…", "常に手前に表示（アプリ指定）…", "다음 앱 위에 항상 표시…", "始终置顶于…", "永遠在最上層於…"],
+"pin_everywhere": ["Everywhere (all apps)", "Partout (toutes les applis)", "En todas partes (todas las apps)", "どこでも（すべてのアプリ）", "어디서나 (모든 앱)", "所有应用", "所有應用程式"],
+"usage_access": ["Allow usage access for DroRef so it can tell which app is open, then tap 📌 again.", "Autorisez l'accès aux données d'utilisation pour DroRef afin qu'il sache quelle appli est ouverte, puis touchez 📌 à nouveau.", "Permite el acceso a datos de uso para DroRef, así sabe qué app está abierta, y vuelve a tocar 📌.", "DroRef に「使用状況へのアクセス」を許可して、開いているアプリを判別できるようにしてから、もう一度 📌 をタップしてください。", "DroRef가 열린 앱을 알 수 있도록 사용 정보 접근을 허용한 뒤 📌를 다시 누르세요.", "请允许 DroRef 访问使用情况，以便识别当前打开的应用，然后再点 📌。", "請允許 DroRef 存取使用情形，以辨識目前開啟的應用程式，然後再點 📌。"],
+"pinned_to": ["Shown only over %1$s", "Affiché seulement par-dessus %1$s", "Solo se muestra sobre %1$s", "%1$s の上でのみ表示", "%1$s 위에서만 표시", "仅在 %1$s 上方显示", "僅在 %1$s 上方顯示"],
 # settings
 "on": ["On", "Activé", "Sí", "オン", "켜기", "开", "開"],
 "off": ["Off", "Désactivé", "No", "オフ", "끄기", "关", "關"],

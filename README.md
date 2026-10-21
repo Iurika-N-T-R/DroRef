@@ -13,7 +13,7 @@ From PureRef 2, save with *Save as → Legacy PureRef scene* first.
 - Tap to select. Drag to move; pinch or twist with two fingers to scale and rotate.
 - Long-press an item to add it to the selection. Long-press empty space and drag to select a rectangle; release without dragging for the canvas menu.
 - The bar at the bottom has what fits the selection: crop, flip, arrange, align, group, GIF/video controls, and *More…*.
-- *Always on top* floats the board over your drawing app. Its bar has opacity, transparent-to-touch (for tracing) and no-background (only the images float).
+- *Always on top* floats the board over your drawing app. Its bar has opacity, transparent-to-touch (for tracing), no-background (only the images float), and 📌 to show it only over one app (Android asks once for usage access).
 
 Everything PureRef has, and what's done here: [FEATURES.md](FEATURES.md)
 

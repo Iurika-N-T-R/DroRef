@@ -197,6 +197,10 @@
     <string name="settings_imported">설정을 가져왔습니다</string>
     <string name="export_format">자른 이미지 형식</string>
     <string name="parent_to">부모 지정…</string>
+    <string name="ov_pin">다음 앱 위에 항상 표시…</string>
+    <string name="pin_everywhere">어디서나 (모든 앱)</string>
+    <string name="usage_access">DroRef가 열린 앱을 알 수 있도록 사용 정보 접근을 허용한 뒤 📌를 다시 누르세요.</string>
+    <string name="pinned_to">%1$s 위에서만 표시</string>
     <string name="on">켜기</string>
     <string name="off">끄기</string>
     <string name="theme">테마</string>

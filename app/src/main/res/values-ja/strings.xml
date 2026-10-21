@@ -197,6 +197,10 @@
     <string name="settings_imported">設定を読み込みました</string>
     <string name="export_format">切り抜いた画像の形式</string>
     <string name="parent_to">親を指定…</string>
+    <string name="ov_pin">常に手前に表示（アプリ指定）…</string>
+    <string name="pin_everywhere">どこでも（すべてのアプリ）</string>
+    <string name="usage_access">DroRef に「使用状況へのアクセス」を許可して、開いているアプリを判別できるようにしてから、もう一度 📌 をタップしてください。</string>
+    <string name="pinned_to">%1$s の上でのみ表示</string>
     <string name="on">オン</string>
     <string name="off">オフ</string>
     <string name="theme">テーマ</string>

@@ -197,6 +197,10 @@
     <string name="settings_imported">設定已匯入</string>
     <string name="export_format">裁切圖片的格式</string>
     <string name="parent_to">設為子層於…</string>
+    <string name="ov_pin">永遠在最上層於…</string>
+    <string name="pin_everywhere">所有應用程式</string>
+    <string name="usage_access">請允許 DroRef 存取使用情形，以辨識目前開啟的應用程式，然後再點 📌。</string>
+    <string name="pinned_to">僅在 %1$s 上方顯示</string>
     <string name="on">開</string>
     <string name="off">關</string>
     <string name="theme">主題</string>
