@@ -201,6 +201,7 @@
     <string name="pin_everywhere">所有应用</string>
     <string name="usage_access">请允许 DroRef 访问使用情况，以便识别当前打开的应用，然后再点 📌。</string>
     <string name="pinned_to">仅在 %1$s 上方显示</string>
+    <string name="focus_mode">专注模式</string>
     <string name="on">开</string>
     <string name="off">关</string>
     <string name="theme">主题</string>

@@ -34,6 +34,8 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import android.widget.PopupMenu
+import android.graphics.drawable.GradientDrawable
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
@@ -66,48 +68,141 @@ class MainActivity : Activity(), BoardView.Host {
     private val barEntries = ArrayList<Pair<String, () -> Unit>>()
     private var menuPrefix = ""
     private var exportJpg = false
+    private lateinit var titleView: TextView
+    private lateinit var menuBtn: TextView
+    private lateinit var eyeBtn: TextView
+    private lateinit var addBtn: TextView
+    private lateinit var topLeft: LinearLayout
+    private lateinit var topRight: LinearLayout
+    private lateinit var undoBtns: List<TextView>
+    private var focusMode = false
 
     private fun s(id: Int, vararg args: Any) = getString(id, *args)
 
     override fun attachBaseContext(base: Context) = super.attachBaseContext(base.localized())
 
+    private val light get() = Prefs.theme == 1
+    private val dp by lazy { resources.displayMetrics.density }
+    private fun px(v: Int) = (v * dp).toInt()
+    private val chipBg get() = if (light) 0xF2FFFFFF.toInt() else 0xF2404040.toInt() // stands out from the canvas
+    private val chipLine get() = if (light) 0x22000000 else 0x33FFFFFF
+    private val chipFg get() = if (light) 0xFF222222.toInt() else 0xFFFFFFFF.toInt()
+
+    /** Round floating button, VizRef-style. */
+    private fun round(label: String, desc: String, f: () -> Unit) = TextView(this).apply {
+        text = label
+        contentDescription = desc
+        gravity = Gravity.CENTER
+        textSize = 18f
+        setTextColor(chipFg)
+        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(chipBg); setStroke(px(1), chipLine) }
+        elevation = 6 * dp
+        setOnClickListener { f() }
+        layoutParams = LinearLayout.LayoutParams(px(44), px(44)).apply { setMargins(px(4), px(4), px(4), px(4)) }
+    }
+
+    private fun pill() = GradientDrawable().apply { cornerRadius = 24 * dp; setColor(chipBg); setStroke(px(1), chipLine) }
+
     override fun onCreate(state: Bundle?) {
         Prefs.init(this)
-        setTheme(if (Prefs.theme == 1) android.R.style.Theme_DeviceDefault_Light_DarkActionBar else android.R.style.Theme_DeviceDefault)
+        setTheme(if (light) android.R.style.Theme_DeviceDefault_Light_NoActionBar else android.R.style.Theme_DeviceDefault_NoActionBar)
         super.onCreate(state)
         val scene = Scene.current(this, s(R.string.untitled))
         board = BoardView(this, scene).apply { host = this@MainActivity }
         info = TextView(this).apply {
             visibility = View.GONE
-            setBackgroundColor(0xDD000000.toInt())
+            background = GradientDrawable().apply { cornerRadius = 12 * dp; setColor(0xE6000000.toInt()) }
             setTextColor(0xFFFFFFFF.toInt())
-            setPadding(32, 20, 32, 20)
+            setPadding(px(14), px(10), px(14), px(10))
+            elevation = 6 * dp
             setOnClickListener { copyText(infoHex) }
         }
-        bar = LinearLayout(this)
+        bar = LinearLayout(this).apply { setPadding(px(6), 0, px(6), 0) }
         barScroll = HorizontalScrollView(this).apply {
             addView(bar)
             visibility = View.GONE
-            setBackgroundColor(if (Prefs.theme == 1) 0xFFF2F2F2.toInt() else 0xFF1E1E1E.toInt())
+            isHorizontalScrollBarEnabled = false
+            background = pill()
+            elevation = 8 * dp
         }
-        val frame = FrameLayout(this).apply {
-            addView(board)
-            addView(info, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+        // canvas fills the screen; everything else floats over it (VizRef's minimal UI)
+        titleView = TextView(this).apply {
+            setTextColor(chipFg)
+            textSize = 15f
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            maxWidth = px(200)
+            gravity = Gravity.CENTER_VERTICAL
+            background = pill()
+            elevation = 6 * dp
+            setPadding(px(14), 0, px(14), 0)
+            setOnClickListener { openScene() }
+            layoutParams = LinearLayout.LayoutParams(-2, px(44)).apply { setMargins(px(4), px(4), px(4), px(4)) }
         }
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(frame, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(barScroll, -1, -2)
+        menuBtn = round("☰", s(R.string.settings)) { openMenu() }
+        topLeft = LinearLayout(this).apply { addView(menuBtn); addView(titleView) }
+        eyeBtn = round("👁", s(R.string.focus_mode)) { setFocusMode(!focusMode) }
+        undoBtns = listOf(round("↶", s(R.string.undo)) { board.undo() }, round("↷", s(R.string.redo)) { board.redo() })
+        topRight = LinearLayout(this).apply { undoBtns.forEach(::addView); addView(eyeBtn) }
+        addBtn = round("＋", s(R.string.add_images)) { pickMedia(REQ_ADD, multiple = true) }.apply {
+            textSize = 24f
+            layoutParams = FrameLayout.LayoutParams(px(56), px(56), Gravity.BOTTOM or Gravity.END).apply { setMargins(0, 0, px(16), px(16)) }
+        }
+        val ui = FrameLayout(this).apply {
+            clipToPadding = false
+            addView(topLeft, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply { setMargins(px(8), px(8), 0, 0) })
+            addView(topRight, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply { setMargins(0, px(8), px(8), 0) })
+            addView(info, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { setMargins(px(16), px(64), px(16), 0) })
+            addView(barScroll, FrameLayout.LayoutParams(-2, px(52), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { setMargins(px(12), 0, px(12), px(12)) })
+            addView(addBtn)
             setOnApplyWindowInsetsListener { v, ins ->
                 @Suppress("DEPRECATION")
-                val bottom = if (Build.VERSION.SDK_INT >= 30) ins.getInsets(WindowInsets.Type.systemBars()).bottom else ins.systemWindowInsetBottom
-                v.setPadding(0, 0, 0, bottom)
+                val i = if (Build.VERSION.SDK_INT >= 30) ins.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+                    .let { intArrayOf(it.left, it.top, it.right, it.bottom) }
+                else intArrayOf(ins.systemWindowInsetLeft, ins.systemWindowInsetTop, ins.systemWindowInsetRight, ins.systemWindowInsetBottom)
+                v.setPadding(i[0], i[1], i[2], i[3])
                 ins
             }
         }
-        setContentView(root)
+        setContentView(FrameLayout(this).apply { addView(board); addView(ui) })
+        edgeToEdge() // needs the window's views, so after setContentView
         remember(scene)
         if (state == null) handle(intent)
+    }
+
+    /** Draw behind the status and navigation bars; the floating UI gets the insets as padding. */
+    @Suppress("DEPRECATION")
+    private fun edgeToEdge() {
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= 30) {
+            window.setDecorFitsSystemWindows(false)
+            val lightBars = if (light) android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS else 0
+            window.insetsController?.setSystemBarsAppearance(lightBars,
+                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS)
+        } else {
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or (if (light) View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR else 0)
+        }
+    }
+
+    /** VizRef's eye: hide the UI and only look (pan, zoom, double-tap to zoom in); nothing can be moved by accident. */
+    private fun setFocusMode(on: Boolean) {
+        focusMode = on
+        board.viewOnly = on
+        if (on) board.clearSelection()
+        val v = if (on) View.GONE else View.VISIBLE
+        topLeft.visibility = v
+        undoBtns.forEach { it.visibility = v }
+        eyeBtn.alpha = if (on) 0.5f else 1f
+        selectionChanged()
+    }
+
+    private fun openMenu() {
+        val p = PopupMenu(this, menuBtn)
+        buildMenu(p.menu)
+        p.setOnMenuItemClickListener { item -> actions[item.itemId]?.let { it(); true } ?: false }
+        p.show()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -149,6 +244,7 @@ class MainActivity : Activity(), BoardView.Host {
         Boards.scene = sc
         Prefs.scene = sc.dir.name
         title = sc.name
+        titleView.text = sc.name
     }
 
     private fun switchTo(sc: Scene) {
@@ -169,16 +265,15 @@ class MainActivity : Activity(), BoardView.Host {
         }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu) = true
-
-    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+    private fun buildMenu(menu: Menu) {
         menu.clear()
         actions.clear()
         menuEntries.clear()
         menuPrefix = ""
-        menu.act("↶", always = true, name = s(R.string.undo)) { board.undo() }
-        menu.act("↷", always = true, name = s(R.string.redo)) { board.redo() }
-        menu.act("＋", always = true, name = s(R.string.add_images)) { pickMedia(REQ_ADD, multiple = true) }
+        menuEntries += s(R.string.undo) to { board.undo() }
+        menuEntries += s(R.string.redo) to { board.redo() }
+        menuEntries += s(R.string.add_images) to { pickMedia(REQ_ADD, multiple = true) }
+        menuEntries += s(R.string.focus_mode) to { setFocusMode(!focusMode) }
         menu.act(s(R.string.command_palette)) { palette() }
         menu.act(s(R.string.paste)) { paste() }
         menu.act(s(R.string.add_note)) { noteEditor(null) }
@@ -194,7 +289,7 @@ class MainActivity : Activity(), BoardView.Host {
             act(s(R.string.save)) { save() }
             act(s(R.string.save_as)) { saveAs() }
             act(s(R.string.my_scenes)) { openScene() }
-            act(s(R.string.rename)) { editText(s(R.string.scene_name), board.scene.name) { board.scene.name = it; board.scene.save(); title = it } }
+            act(s(R.string.rename)) { editText(s(R.string.scene_name), board.scene.name) { board.scene.name = it; board.scene.save(); title = it; titleView.text = it } }
             act(s(R.string.duplicate_scene)) { board.scene.save(); switchTo(board.scene.copy(this@MainActivity, s(R.string.copy_of, board.scene.name))) }
             act(s(R.string.delete_scene)) { deleteScene() }
         }
@@ -213,9 +308,9 @@ class MainActivity : Activity(), BoardView.Host {
         }
         menu.addSubMenu(s(R.string.canvas)).apply {
             menuPrefix = s(R.string.canvas) + " › "
-            act(s(R.string.grid_none), checked = Prefs.grid == 0) { Prefs.grid = 0; board.invalidate() }
-            act(s(R.string.grid_lines), checked = Prefs.grid == 1) { Prefs.grid = 1; board.invalidate() }
             act(s(R.string.grid_dots), checked = Prefs.grid == 2) { Prefs.grid = 2; board.invalidate() }
+            act(s(R.string.grid_lines), checked = Prefs.grid == 1) { Prefs.grid = 1; board.invalidate() }
+            act(s(R.string.grid_none), checked = Prefs.grid == 0) { Prefs.grid = 0; board.invalidate() }
             act(s(R.string.snap), checked = Prefs.snap) { Prefs.snap = !Prefs.snap }
             act(s(R.string.lock_canvas), checked = Prefs.canvasLocked) { toggleCanvasLock() }
             act(s(R.string.arrange_all)) { board.clearSelection(); board.arrange("optimal") }
@@ -223,13 +318,6 @@ class MainActivity : Activity(), BoardView.Host {
         menuPrefix = ""
         menu.act(s(R.string.settings)) { showSettings() }
         menu.act(s(R.string.about)) { about() }
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        val f = actions[item.itemId] ?: return super.onOptionsItemSelected(item)
-        f()
-        return true
     }
 
     private fun toggleCanvasLock() {
@@ -241,6 +329,7 @@ class MainActivity : Activity(), BoardView.Host {
 
     private fun compact(label: String, f: () -> Unit) = Button(this, null, android.R.attr.borderlessButtonStyle).apply {
         text = label
+        setTextColor(chipFg)
         isAllCaps = false
         minWidth = 0
         minimumWidth = 0 // the button style sets both
@@ -274,7 +363,7 @@ class MainActivity : Activity(), BoardView.Host {
         }
         barScroll.scrollTo(0, 0)
         barScroll.visibility = if (bar.childCount > 0) View.VISIBLE else View.GONE
-        invalidateOptionsMenu()
+        addBtn.visibility = if (bar.childCount > 0 || focusMode) View.GONE else View.VISIBLE
     }
 
     private fun drawBar() {
@@ -698,7 +787,6 @@ class MainActivity : Activity(), BoardView.Host {
         board.picking = on
         info.visibility = if (on) View.VISIBLE else View.GONE
         info.text = s(R.string.picker_hint)
-        invalidateOptionsMenu()
     }
 
     // ---- floating window
@@ -997,6 +1085,7 @@ class MainActivity : Activity(), BoardView.Host {
 
     /** Search every command: menus, the current bar, settings (PureRef's command palette). */
     private fun palette() {
+        buildMenu(PopupMenu(this, menuBtn).menu) // fresh labels and checkmarks
         val opts = settingsOpts()
         val all = (barEntries + menuEntries).distinctBy { it.first } +
             opts.mapIndexed { i, o -> "${s(R.string.settings)} › ${o.label}" to { editSetting(i, o, reopen = false) } }
@@ -1066,6 +1155,7 @@ class MainActivity : Activity(), BoardView.Host {
     /** Leaves the current mode first; returns false when there was nothing to leave. */
     private fun back(): Boolean {
         when {
+            focusMode -> setFocusMode(false)
             board.picking -> setPicking(false)
             board.drawing -> board.stopDrawing()
             board.slides.isNotEmpty() -> board.stopSlideshow()

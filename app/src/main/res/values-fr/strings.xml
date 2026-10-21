@@ -201,6 +201,7 @@
     <string name="pin_everywhere">Partout (toutes les applis)</string>
     <string name="usage_access">Autorisez l\'accès aux données d\'utilisation pour DroRef afin qu\'il sache quelle appli est ouverte, puis touchez 📌 à nouveau.</string>
     <string name="pinned_to">Affiché seulement par-dessus %1$s</string>
+    <string name="focus_mode">Mode focus</string>
     <string name="on">Activé</string>
     <string name="off">Désactivé</string>
     <string name="theme">Thème</string>

@@ -194,6 +194,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         private set
     val selection = LinkedHashSet<Long>()
     var picking = false
+    var viewOnly = false // focus mode: look, pan, zoom; nothing moves
     var cropId = -1L
         private set
     var background = 0 // floating window: 0 solid, 1 glass, 2 none
@@ -912,27 +913,38 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         for (d in -1..1) c.drawCircle(p[0] + d * r * 0.45f, p[1], r * 0.14f, badgeDot)
     }
 
+    /** Dot or line background (RefCanvas / VizRef style). Spacing grows ×5 when zoomed out, so it never turns into noise. */
     private fun drawGrid(c: Canvas) {
         val grid = Prefs.grid
         if (grid == 0) return
+        val light = Prefs.theme == 1
         val s = camScale()
         var step = GRID
-        while (step * s < 16 * dp) step *= 2
+        while (step * s < 18 * dp) step *= 5
         val v = FloatArray(9).also(cam::getValues)
         val tl = toBoard(0f, 0f)
         val br = toBoard(width.toFloat(), height.toFloat())
-        val x0 = floor(tl[0] / step) * step
-        val y0 = floor(tl[1] / step) * step
+        val i0 = floor(tl[0] / step).toInt()
+        val j0 = floor(tl[1] / step).toInt()
+        val i1 = floor(br[0] / step).toInt() + 1
+        val j1 = floor(br[1] / step).toInt() + 1
         if (grid == 1) {
             gridPaint.strokeWidth = 1f
-            var x = x0; while (x <= br[0]) { val sx = x * s + v[2]; c.drawLine(sx, 0f, sx, height.toFloat(), gridPaint); x += step }
-            var y = y0; while (y <= br[1]) { val sy = y * s + v[5]; c.drawLine(0f, sy, width.toFloat(), sy, gridPaint); y += step }
+            for (major in listOf(false, true)) {
+                gridPaint.color = if (light) (if (major) 0x30000000 else 0x14000000) else (if (major) 0x30FFFFFF else 0x12FFFFFF)
+                for (i in i0..i1) if ((Math.floorMod(i, 5) == 0) == major) { val x = i * step * s + v[2]; c.drawLine(x, 0f, x, height.toFloat(), gridPaint) }
+                for (j in j0..j1) if ((Math.floorMod(j, 5) == 0) == major) { val y = j * step * s + v[5]; c.drawLine(0f, y, width.toFloat(), y, gridPaint) }
+            }
         } else {
-            gridPaint.strokeWidth = 3 * dp
-            val pts = ArrayList<Float>()
-            var x = x0
-            while (x <= br[0]) { var y = y0; while (y <= br[1]) { pts += x * s + v[2]; pts += y * s + v[5]; y += step }; x += step }
-            c.drawPoints(pts.toFloatArray(), gridPaint)
+            gridPaint.color = if (light) 0x38000000 else 0x38FFFFFF
+            gridPaint.strokeWidth = 2.6f * dp
+            val pts = FloatArray(((i1 - i0 + 1) * (j1 - j0 + 1) * 2).coerceAtMost(400_000))
+            var n = 0
+            loop@ for (i in i0..i1) for (j in j0..j1) {
+                if (n + 2 > pts.size) break@loop
+                pts[n++] = i * step * s + v[2]; pts[n++] = j * step * s + v[5]
+            }
+            c.drawPoints(pts, 0, n, gridPaint)
         }
     }
 
@@ -1006,7 +1018,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
             }
             cropId >= 0 -> if (cropDown(e.x, e.y)) G.CROP else G.CAMERA
             else -> {
-                downHit = if (Prefs.canvasLocked) null else hit(e.x, e.y)
+                downHit = if (Prefs.canvasLocked || viewOnly) null else hit(e.x, e.y)
                 if (downHit != null) G.ITEMS else G.CAMERA
             }
         }
@@ -1117,6 +1129,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         if (picking || cropId >= 0 || drawing) return false
         val raw = hitRaw(e.x, e.y)
         val top = raw?.let(::resolve)
+        if (viewOnly) { if (raw == null) focusAll() else focus(listOf(top ?: raw)); return true }
         when {
             raw == null -> focusAll()
             top != null && top.id != raw.id && top.type == GROUP -> { entered = top.id; select(listOf(resolve(raw))) } // open the group
@@ -1127,7 +1140,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     }
 
     private fun longPress(e: MotionEvent) {
-        if (moved || picking || cropId >= 0 || drawing || g == G.NONE) return
+        if (moved || picking || cropId >= 0 || drawing || viewOnly || g == G.NONE) return
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
         val any = hitAny(e.x, e.y)
         val h = downHit

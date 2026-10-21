@@ -202,6 +202,7 @@
     <string name="pin_everywhere">Everywhere (all apps)</string>
     <string name="usage_access">Allow usage access for DroRef so it can tell which app is open, then tap 📌 again.</string>
     <string name="pinned_to">Shown only over %1$s</string>
+    <string name="focus_mode">Focus mode</string>
     <string name="on">On</string>
     <string name="off">Off</string>
     <string name="theme">Theme</string>

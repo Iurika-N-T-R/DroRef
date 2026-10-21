@@ -233,6 +233,7 @@ S = {
 "pin_everywhere": ["Everywhere (all apps)", "Partout (toutes les applis)", "En todas partes (todas las apps)", "どこでも（すべてのアプリ）", "어디서나 (모든 앱)", "所有应用", "所有應用程式"],
 "usage_access": ["Allow usage access for DroRef so it can tell which app is open, then tap 📌 again.", "Autorisez l'accès aux données d'utilisation pour DroRef afin qu'il sache quelle appli est ouverte, puis touchez 📌 à nouveau.", "Permite el acceso a datos de uso para DroRef, así sabe qué app está abierta, y vuelve a tocar 📌.", "DroRef に「使用状況へのアクセス」を許可して、開いているアプリを判別できるようにしてから、もう一度 📌 をタップしてください。", "DroRef가 열린 앱을 알 수 있도록 사용 정보 접근을 허용한 뒤 📌를 다시 누르세요.", "请允许 DroRef 访问使用情况，以便识别当前打开的应用，然后再点 📌。", "請允許 DroRef 存取使用情形，以辨識目前開啟的應用程式，然後再點 📌。"],
 "pinned_to": ["Shown only over %1$s", "Affiché seulement par-dessus %1$s", "Solo se muestra sobre %1$s", "%1$s の上でのみ表示", "%1$s 위에서만 표시", "仅在 %1$s 上方显示", "僅在 %1$s 上方顯示"],
+"focus_mode": ["Focus mode", "Mode focus", "Modo enfoque", "フォーカスモード", "집중 모드", "专注模式", "專注模式"],
 # settings
 "on": ["On", "Activé", "Sí", "オン", "켜기", "开", "開"],
 "off": ["Off", "Désactivé", "No", "オフ", "끄기", "关", "關"],

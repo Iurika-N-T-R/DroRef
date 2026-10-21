@@ -35,7 +35,7 @@ object Prefs {
     }
 
     var scene by str("scene", "")
-    var grid by int("grid", 0)                    // 0 none, 1 lines, 2 dots
+    var grid by int("grid", 2)                    // 0 none, 1 lines, 2 dots (default, like VizRef / RefCanvas boards)
     var snap by bool("snap", false)
     var canvasGray by bool("gray", false)
     var canvasLocked by bool("locked", false)

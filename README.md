@@ -8,6 +8,7 @@ Boards move between the two as `.pur` files: *File → Open .pur*, *Save*, *Save
 From PureRef 2, save with *Save as → Legacy PureRef scene* first.
 
 ## Using it
+- The canvas fills the screen (dot background by default; grid or plain in ☰ → Canvas). Floating buttons: ☰ menu and scene name top-left, ↶ ↷ and 👁 focus mode top-right, ＋ bottom-right. UI inspired by VizRef.
 - **＋** adds images and videos. You can also paste them, paste a link, or use *Share → DroRef* from any app.
 - Drag empty space to pan, pinch to zoom, double-tap to focus.
 - Tap to select. Drag to move; pinch or twist with two fingers to scale and rotate.

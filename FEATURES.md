@@ -31,7 +31,8 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 
 ## Navigation & canvas
 - ✅ Pan, pinch zoom, mouse wheel · ✅ double-tap focus (again = back) · ✅ focus canvas · ✅ next / previous
-- ✅ Reset camera / zoom · ✅ lock canvas (Ctrl+R) · ✅ grayscale canvas · ✅ grid lines / dots / none · ✅ snap to grid
+- ✅ Reset camera / zoom · ✅ lock canvas (Ctrl+R) · ✅ grayscale canvas · ✅ background dots (default) / grid with major lines / plain · ✅ snap to grid
+- ✅ Full-screen canvas with floating buttons and a pill toolbar · ✅ focus mode 👁: UI hidden, look only (from VizRef)
 - ✅ Color picker + image coordinates (RGB / HSV / HEX, tap to copy)
 - ✅ Slideshow (Alt+S): interval and order (ordered / shuffle / random) in settings; panning pauses it
 

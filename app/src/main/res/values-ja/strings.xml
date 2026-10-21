@@ -201,6 +201,7 @@
     <string name="pin_everywhere">どこでも（すべてのアプリ）</string>
     <string name="usage_access">DroRef に「使用状況へのアクセス」を許可して、開いているアプリを判別できるようにしてから、もう一度 📌 をタップしてください。</string>
     <string name="pinned_to">%1$s の上でのみ表示</string>
+    <string name="focus_mode">フォーカスモード</string>
     <string name="on">オン</string>
     <string name="off">オフ</string>
     <string name="theme">テーマ</string>
