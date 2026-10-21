@@ -8,6 +8,7 @@ import android.graphics.RectF
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.text.style.LeadingMarginSpan
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -94,6 +95,8 @@ data class Item(
     val strokes: List<Stroke> = emptyList(),
     val loopA: Float = 0f,                 // video loop, as fractions of the duration
     val loopB: Float = 1f,
+    val noteWidth: Float = 0f,             // note wrap width; 0 = auto size (one line per paragraph)
+    val comment: String = "",              // image comment (PureRef 2)
 ) {
     /** Content coords -> board coords. */
     fun matrix() = Matrix().apply {
@@ -138,7 +141,7 @@ data class Item(
     }
 
     fun withText(t: String, sp: String = spans): Item {
-        val (nw, nh) = noteSize(t, sp)
+        val (nw, nh) = noteSize(t, sp, noteWidth)
         return copy(text = t, spans = sp, w = nw, h = nh, crop = RectF(0f, 0f, nw, nh))
     }
 
@@ -165,6 +168,7 @@ data class Item(
         put("parent", parent); put("closed", closed); put("spans", spans)
         put("strokes", JSONArray(strokes.map { it.toJson() }))
         put("loopA", loopA.toDouble()); put("loopB", loopB.toDouble())
+        put("noteWidth", noteWidth.toDouble()); put("comment", comment)
     }
 
     companion object {
@@ -181,25 +185,25 @@ data class Item(
                 o.optInt("textColor", -1), o.optInt("bgColor", 0xCC202020.toInt()),
                 o.optLong("parent"), o.optBoolean("closed", true), o.optString("spans"),
                 if (st == null) emptyList() else List(st.length()) { Stroke.fromJson(st.getJSONObject(it)) },
-                f("loopA", 0f), f("loopB", 1f),
+                f("loopA", 0f), f("loopB", 1f), f("noteWidth", 0f), o.optString("comment"),
             )
         }
     }
 }
 
-/** Lays out a note's (rich) text at its natural width: one line per paragraph, like PureRef's auto size. */
-fun noteLayout(text: String, spans: String, color: Int, paint: TextPaint): StaticLayout {
+/** Lays out a note's (rich) text: at [width] if set, else at its natural width (one line per paragraph, PureRef's auto size). */
+fun noteLayout(text: String, spans: String, color: Int, paint: TextPaint, width: Float = 0f): StaticLayout {
     val s = Rich.build(text, spans)
     paint.color = color
-    val bullets = if (spans.contains("\"bullet\"")) 40 else 0
-    val w = (ceil(Layout.getDesiredWidth(s, paint)).toInt() + bullets).coerceAtLeast(1)
-    return StaticLayout.Builder.obtain(s, 0, s.length, paint, w).setIncludePad(false).build()
+    val margin = s.getSpans(0, s.length, LeadingMarginSpan::class.java).maxOfOrNull { it.getLeadingMargin(true) } ?: 0
+    val w = if (width > 0) width.toInt() else ceil(Layout.getDesiredWidth(s, paint)).toInt() + margin
+    return StaticLayout.Builder.obtain(s, 0, s.length, paint, w.coerceAtLeast(1)).setIncludePad(false).build()
 }
 
 private val measure = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = NOTE_TEXT }
 
-fun noteSize(text: String, spans: String = ""): Pair<Float, Float> = synchronized(measure) {
-    val l = noteLayout(text, spans, -1, measure)
+fun noteSize(text: String, spans: String = "", width: Float = 0f): Pair<Float, Float> = synchronized(measure) {
+    val l = noteLayout(text, spans, -1, measure, width)
     (l.width + 2 * NOTE_PAD) to (l.height + 2 * NOTE_PAD)
 }
 

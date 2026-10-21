@@ -50,6 +50,9 @@ private const val REQ_OPEN = 3
 private const val REQ_SAVE_AS = 4
 private const val REQ_PNG = 5
 private const val REQ_IMAGES = 6
+private const val REQ_SETTINGS_OUT = 7
+private const val REQ_SETTINGS_IN = 8
+private const val CLIP_LABEL = "droref-items"
 
 class MainActivity : Activity(), BoardView.Host {
     private lateinit var board: BoardView
@@ -59,6 +62,10 @@ class MainActivity : Activity(), BoardView.Host {
     private var infoHex = ""
     private var exportItems: List<Item> = emptyList()
     private val actions = HashMap<Int, () -> Unit>()
+    private val menuEntries = ArrayList<Pair<String, () -> Unit>>() // for the command palette
+    private val barEntries = ArrayList<Pair<String, () -> Unit>>()
+    private var menuPrefix = ""
+    private var exportJpg = false
 
     private fun s(id: Int, vararg args: Any) = getString(id, *args)
 
@@ -78,7 +85,11 @@ class MainActivity : Activity(), BoardView.Host {
             setOnClickListener { copyText(infoHex) }
         }
         bar = LinearLayout(this)
-        barScroll = HorizontalScrollView(this).apply { addView(bar); visibility = View.GONE; setBackgroundColor(0xFF1E1E1E.toInt()) }
+        barScroll = HorizontalScrollView(this).apply {
+            addView(bar)
+            visibility = View.GONE
+            setBackgroundColor(if (Prefs.theme == 1) 0xFFF2F2F2.toInt() else 0xFF1E1E1E.toInt())
+        }
         val frame = FrameLayout(this).apply {
             addView(board)
             addView(info, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
@@ -148,9 +159,10 @@ class MainActivity : Activity(), BoardView.Host {
 
     // ---- menu
 
-    private fun Menu.act(title: String, always: Boolean = false, checked: Boolean? = null, f: () -> Unit) {
+    private fun Menu.act(title: String, always: Boolean = false, checked: Boolean? = null, name: String = title, f: () -> Unit) {
         val id = actions.size + 1
         actions[id] = f
+        menuEntries += (menuPrefix + name) to f
         add(Menu.NONE, id, Menu.NONE, title).apply {
             if (always) setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
             if (checked != null) { isCheckable = true; isChecked = checked }
@@ -162,9 +174,12 @@ class MainActivity : Activity(), BoardView.Host {
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         menu.clear()
         actions.clear()
-        menu.act("↶", always = true) { board.undo() }
-        menu.act("↷", always = true) { board.redo() }
-        menu.act("＋", always = true) { pickMedia(REQ_ADD, multiple = true) }
+        menuEntries.clear()
+        menuPrefix = ""
+        menu.act("↶", always = true, name = s(R.string.undo)) { board.undo() }
+        menu.act("↷", always = true, name = s(R.string.redo)) { board.redo() }
+        menu.act("＋", always = true, name = s(R.string.add_images)) { pickMedia(REQ_ADD, multiple = true) }
+        menu.act(s(R.string.command_palette)) { palette() }
         menu.act(s(R.string.paste)) { paste() }
         menu.act(s(R.string.add_note)) { noteEditor(null) }
         menu.act(s(R.string.draw)) { board.startDrawing() }
@@ -173,6 +188,7 @@ class MainActivity : Activity(), BoardView.Host {
         menu.act(s(R.string.slideshow)) { board.startSlideshow() }
         menu.act(s(R.string.always_on_top)) { alwaysOnTop() }
         menu.addSubMenu(s(R.string.file)).apply {
+            menuPrefix = s(R.string.file) + " › "
             act(s(R.string.new_scene)) { switchTo(Scene.create(this@MainActivity, s(R.string.untitled))) }
             act(s(R.string.open_pur)) { openPur() }
             act(s(R.string.save)) { save() }
@@ -183,10 +199,12 @@ class MainActivity : Activity(), BoardView.Host {
             act(s(R.string.delete_scene)) { deleteScene() }
         }
         menu.addSubMenu(s(R.string.export)).apply {
+            menuPrefix = s(R.string.export) + " › "
             act(s(R.string.export_png)) { exportItems = board.scene.items.toList(); create(REQ_PNG, "image/png", "${board.scene.name}.png") }
-            act(s(R.string.export_images)) { exportItems = board.ordered(); tree() }
+            act(s(R.string.export_images)) { exportItems = board.ordered(); exportFiles() }
         }
         menu.addSubMenu(s(R.string.view)).apply {
+            menuPrefix = s(R.string.view) + " › "
             act(s(R.string.focus_canvas)) { board.focusAll() }
             act(s(R.string.reset_zoom)) { board.resetZoom() }
             act(s(R.string.reset_camera)) { board.resetCamera() }
@@ -194,6 +212,7 @@ class MainActivity : Activity(), BoardView.Host {
             act(s(R.string.grayscale_canvas), checked = Prefs.canvasGray) { Prefs.canvasGray = !Prefs.canvasGray; board.invalidate() }
         }
         menu.addSubMenu(s(R.string.canvas)).apply {
+            menuPrefix = s(R.string.canvas) + " › "
             act(s(R.string.grid_none), checked = Prefs.grid == 0) { Prefs.grid = 0; board.invalidate() }
             act(s(R.string.grid_lines), checked = Prefs.grid == 1) { Prefs.grid = 1; board.invalidate() }
             act(s(R.string.grid_dots), checked = Prefs.grid == 2) { Prefs.grid = 2; board.invalidate() }
@@ -201,6 +220,7 @@ class MainActivity : Activity(), BoardView.Host {
             act(s(R.string.lock_canvas), checked = Prefs.canvasLocked) { toggleCanvasLock() }
             act(s(R.string.arrange_all)) { board.clearSelection(); board.arrange("optimal") }
         }
+        menuPrefix = ""
         menu.act(s(R.string.settings)) { showSettings() }
         menu.act(s(R.string.about)) { about() }
         return true
@@ -229,15 +249,28 @@ class MainActivity : Activity(), BoardView.Host {
         setOnClickListener { f() }
     }
 
-    private fun button(label: String, f: () -> Unit) = bar.addView(compact(label, f))
+    private fun button(label: String, f: () -> Unit) {
+        bar.addView(compact(label, f))
+        barEntries += label to f
+    }
+
+    /** Text in the bar that isn't a command (frame number, slide count). */
+    private fun label(text: String) = bar.addView(compact(text) {}.apply { isEnabled = false })
 
     override fun selectionChanged() {
         bar.removeAllViews()
+        barEntries.clear()
         when {
             board.drawing -> drawBar()
             board.slides.isNotEmpty() -> slideBar()
             board.cropId >= 0 -> { button(s(R.string.done)) { board.endCrop() }; button(s(R.string.reset_crop)) { board.resetCrop() } }
             board.selection.isNotEmpty() -> selectionBar()
+        }
+        // a selected item's comment shows at the top, like PureRef's comment popup
+        val comment = board.selected().singleOrNull()?.comment.orEmpty()
+        if (!board.picking) {
+            info.visibility = if (comment.isEmpty()) View.GONE else View.VISIBLE
+            info.text = "💬 $comment"
         }
         barScroll.scrollTo(0, 0)
         barScroll.visibility = if (bar.childCount > 0) View.VISIBLE else View.GONE
@@ -262,7 +295,7 @@ class MainActivity : Activity(), BoardView.Host {
         button("⏮") { board.slideStep(-1) }
         button(s(if (board.slidePaused) R.string.play else R.string.pause)) { board.toggleSlidePause() }
         button("⏭") { board.slideStep(1) }
-        button("${board.slideIndex + 1} / ${board.slides.size}") {}
+        label("${board.slideIndex + 1} / ${board.slides.size}")
         button(s(R.string.stop)) { board.stopSlideshow() }
     }
 
@@ -271,10 +304,20 @@ class MainActivity : Activity(), BoardView.Host {
         val one = sel.singleOrNull()
         val groups = sel.any { it.type == GROUP }
         when (one?.type) {
-            NOTE -> { button(s(R.string.edit)) { noteEditor(one) }; button(s(R.string.colors)) { noteColors() } }
+            NOTE -> {
+                button(s(R.string.edit)) { noteEditor(one) }
+                button(s(R.string.colors)) { noteColors() }
+                button(s(R.string.note_width)) {
+                    val widths = floatArrayOf(0f, 240f, 480f, 800f)
+                    choose(s(R.string.note_width), listOf(s(R.string.auto_size), s(R.string.narrow), s(R.string.medium), s(R.string.wide))) { i ->
+                        board.edit { if (it.type == NOTE) it.copy(noteWidth = widths[i]).withText(it.text) else it }
+                    }
+                }
+            }
             DRAW -> button(s(R.string.edit)) { board.startDrawing(one) }
             GIF -> board.gifOf(one)?.let { gif ->
                 button(s(if (gif.playing) R.string.pause else R.string.play)) { gif.playing = !gif.playing; board.invalidate(); selectionChanged() }
+                if (!gif.playing) label("${gif.frame() + 1} / ${gif.frames}")
                 button("◀ ${s(R.string.frame)}") { gif.step(-1); board.invalidate(); selectionChanged() }
                 button("${s(R.string.frame)} ▶") { gif.step(1); board.invalidate(); selectionChanged() }
                 button(s(R.string.speed)) { speed { gif.speed = it } }
@@ -329,12 +372,17 @@ class MainActivity : Activity(), BoardView.Host {
         if (one?.type == IMAGE || one?.type == GIF) entries += s(R.string.replace) to { pickImages(REQ_REPLACE) }
         if (one != null && one.source.startsWith("http")) entries += s(R.string.source) to { open(one.source) }
         if (one != null) entries += s(R.string.rename) to { editText(s(R.string.name), one.name) { board.rename(one, it) } }
+        if (one != null) entries += s(R.string.comment) to {
+            editText(s(R.string.comment), one.comment, allowEmpty = true) { c -> board.apply(listOf(one.copy(comment = c.trim()))) }
+        }
+        entries += s(R.string.copy) to { copyItems() }
+        entries += s(R.string.cut) to { if (board.copySelection()) { markClipboard(); board.delete() } }
         if (sel.any { it.parent != 0L }) entries += s(R.string.unparent) to { board.edit { it.copy(parent = 0) } }
         entries += s(R.string.slideshow) to { board.startSlideshow() }
         entries += s(R.string.export) to {
             exportItems = sel.flatMap { s0 -> board.scene.items.filter { it.id in board.withDescendants(listOf(s0.id)) } }.distinctBy { it.id }
             choose(s(R.string.export), listOf(s(R.string.as_one_png), s(R.string.as_separate))) {
-                if (it == 0) create(REQ_PNG, "image/png", "${board.scene.name}.png") else tree()
+                if (it == 0) create(REQ_PNG, "image/png", "${board.scene.name}.png") else exportFiles()
             }
         }
         choose(s(R.string.more), entries.map { it.first }) { entries[it].second() }
@@ -402,7 +450,10 @@ class MainActivity : Activity(), BoardView.Host {
         tool("↔") { e, a, b -> paragraphSpan(e, a, b, "align", Layout.Alignment.ALIGN_CENTER.ordinal.toString()) }
         tool("⇥") { e, a, b -> paragraphSpan(e, a, b, "align", Layout.Alignment.ALIGN_OPPOSITE.ordinal.toString()) }
         tool("•") { e, a, b -> paragraphSpan(e, a, b, "bullet", "") }
+        tool("1.") { e, a, b -> numbered(e, a, b) }
         tool(Rich.UNCHECKED.toString()) { e, a, b -> checklist(e, a, b) }
+        tool("⇥¶") { e, a, b -> indent(e, a, b, 1) }
+        tool("⇤¶") { e, a, b -> indent(e, a, b, -1) }
         tool("🔗") { e, a, b -> editText(s(R.string.link), "https://") { setSpan(e, a, b, "url", it) } }
         tool(s(R.string.clear)) { e, a, b -> clearSpans(e, a, b) }
         val layout = LinearLayout(this).apply {
@@ -471,6 +522,35 @@ class MainActivity : Activity(), BoardView.Host {
         for (st in starts.reversed()) {
             if (all) e.delete(st, min(st + 2, e.length)) else if (e.getOrNull(st) != Rich.UNCHECKED && e.getOrNull(st) != Rich.CHECKED) e.insert(st, "${Rich.UNCHECKED} ")
         }
+    }
+
+    /** Starts of the paragraphs touched by [a, b]. */
+    private fun paragraphStarts(e: Editable, a: Int, b: Int): List<Int> {
+        val (pa, pb) = paragraphs(e, a, b)
+        val starts = ArrayList<Int>()
+        var i = pa
+        while (i <= pb) { starts += i; val n = e.indexOf('\n', i); if (n < 0 || n >= pb) break; i = n + 1 }
+        return starts
+    }
+
+    /** "1. ", "2. "… in front of each paragraph, or off again. */
+    private fun numbered(e: Editable, a: Int, b: Int) {
+        val starts = paragraphStarts(e, a, b)
+        val num = Regex("^\\d+\\. ")
+        val all = starts.all { num.containsMatchIn(e.subSequence(it, e.length)) }
+        for ((i, st) in starts.withIndex().reversed()) {
+            val m = num.find(e.subSequence(st, e.length))
+            if (m != null) e.delete(st, st + m.value.length)
+            if (!all) e.insert(st, "${i + 1}. ")
+        }
+    }
+
+    private fun indent(e: Editable, a: Int, b: Int, d: Int) {
+        val (pa, pb) = paragraphs(e, a, b)
+        val cur = e.getSpans(pa, pb, android.text.style.LeadingMarginSpan.Standard::class.java)
+        val level = ((cur.maxOfOrNull { it.getLeadingMargin(true) } ?: 0) / Rich.INDENT + d).coerceIn(0, 8)
+        cur.forEach { e.removeSpan(it) }
+        if (level > 0) Rich.span("indent", level.toString())?.let { e.setSpan(it, pa, pb, Spanned.SPAN_EXCLUSIVE_INCLUSIVE) }
     }
 
     private fun clearSpans(e: Editable, a0: Int, b0: Int) {
@@ -556,7 +636,9 @@ class MainActivity : Activity(), BoardView.Host {
     private fun hierarchy() {
         val items = board.ordered()
         if (items.isEmpty()) return
-        val labels = items.map { "　".repeat(board.depth(it)) + icon(it) + " " + label(it) + (if (it.locked) " 🔒" else "") }
+        val labels = items.map {
+            "　".repeat(board.depth(it)) + icon(it) + " " + label(it) + (if (it.locked) " 🔒" else "") + (if (it.comment.isNotEmpty()) " 💬" else "")
+        }
         val dlg = AlertDialog.Builder(this).setTitle(R.string.hierarchy)
             .setItems(labels.toTypedArray()) { _, i -> board.select(listOf(items[i])); board.focus(listOf(items[i])) }
             .create()
@@ -568,6 +650,10 @@ class MainActivity : Activity(), BoardView.Host {
                 s(R.string.rename) to { editText(s(R.string.name), it.name) { n -> board.rename(it, n) } },
                 s(R.string.move_up) to { board.moveAmongSiblings(it, -1); hierarchy() },
                 s(R.string.move_down) to { board.moveAmongSiblings(it, 1); hierarchy() },
+                s(R.string.parent_to) to {
+                    val others = items.filter { o -> o.id !in board.withDescendants(listOf(it.id)) }
+                    choose(s(R.string.parent_to), others.map { o -> icon(o) + " " + label(o) }) { j -> board.setParent(it, others[j].id) }
+                },
                 s(R.string.unparent) to { board.unparent(it) },
                 s(if (it.locked) R.string.unlock else R.string.lock) to { board.apply(listOf(it.copy(locked = !it.locked))) },
                 s(R.string.delete) to { board.select(listOf(it)); board.delete() },
@@ -645,8 +731,18 @@ class MainActivity : Activity(), BoardView.Host {
         if (n < u.size) toast(s(R.string.cant_open, u.size - n))
     }
 
+    /** Copies the selection to DroRef's clipboard and marks the system clipboard, so Paste knows it's ours. */
+    private fun copyItems() {
+        if (!board.copySelection()) return
+        markClipboard()
+    }
+
+    private fun markClipboard() =
+        getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(CLIP_LABEL, "DroRef items"))
+
     private fun paste() {
         val clip = getSystemService(ClipboardManager::class.java).primaryClip ?: return toast(s(R.string.clipboard_empty))
+        if (clip.description?.label == CLIP_LABEL && Boards.clip.isNotEmpty()) return board.pasteItems()
         val u = uris(clip)
         if (u.isNotEmpty()) return addUris(u)
         val t = clip.getItemAt(0).coerceToText(this)?.toString()?.trim().orEmpty()
@@ -767,8 +863,15 @@ class MainActivity : Activity(), BoardView.Host {
         }
     }
 
+    /** Separate files: originals stay as they are; cropped images need a format (PNG or JPG, as in PureRef 2). */
+    private fun exportFiles() {
+        if (exportItems.none { it.isMedia && it.type != VIDEO && it.crop != RectF(0f, 0f, it.w, it.h) }) return tree()
+        choose(s(R.string.export_format), listOf("PNG", "JPG")) { exportJpg = it == 1; tree() }
+    }
+
     private fun exportImages(tree: Uri) {
         val items = exportItems.filter { it.isMedia }
+        val jpg = exportJpg
         val dir = board.scene.images
         thread {
             val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
@@ -777,11 +880,11 @@ class MainActivity : Activity(), BoardView.Host {
                 runCatching {
                     val f = File(dir, it.file)
                     val whole = it.crop == RectF(0f, 0f, it.w, it.h) || it.type == VIDEO
-                    val mime = if (whole) imageMime(f) ?: if (it.type == VIDEO) "video/mp4" else "image/png" else "image/png"
+                    val mime = if (whole) imageMime(f) ?: if (it.type == VIDEO) "video/mp4" else "image/png" else if (jpg) "image/jpeg" else "image/png"
                     val doc = DocumentsContract.createDocument(contentResolver, parent, mime, it.name.ifEmpty { "image ${i + 1}" })!!
                     contentResolver.openOutputStream(doc)!!.use { out ->
                         if (whole) f.inputStream().use { s -> s.copyTo(out) } // untouched original
-                        else cropped(f, it)!!.compress(Bitmap.CompressFormat.PNG, 100, out)
+                        else cropped(f, it)!!.compress(if (jpg) Bitmap.CompressFormat.JPEG else Bitmap.CompressFormat.PNG, if (jpg) 92 else 100, out)
                     }
                     n++
                 }
@@ -830,6 +933,14 @@ class MainActivity : Activity(), BoardView.Host {
             }
             REQ_PNG -> uri?.let(::exportPng)
             REQ_IMAGES -> uri?.let(::exportImages)
+            REQ_SETTINGS_OUT -> uri?.let { u ->
+                runCatching { contentResolver.openOutputStream(u, "wt")!!.use { it.write(Prefs.exportJson().toByteArray()) } }
+                    .onSuccess { toast(s(R.string.exported)) }.onFailure { toast(s(R.string.export_failed, it.message ?: "")) }
+            }
+            REQ_SETTINGS_IN -> uri?.let { u ->
+                runCatching { Prefs.importJson(contentResolver.openInputStream(u)!!.use { String(it.readBytes()) }) }
+                    .onSuccess { toast(s(R.string.settings_imported)); recreate() }.onFailure { toast(s(R.string.couldnt_open)) }
+            }
         }
     }
 
@@ -837,15 +948,14 @@ class MainActivity : Activity(), BoardView.Host {
 
     private class Opt(val label: String, val values: List<String>, val get: () -> Int, val set: (Int) -> Unit)
 
-    private fun showSettings() {
+    private fun settingsOpts(): List<Opt> {
         val onOff = listOf(s(R.string.off), s(R.string.on))
         fun flag(label: Int, get: () -> Boolean, set: (Boolean) -> Unit) = Opt(s(label), onOff, { if (get()) 1 else 0 }) { set(it == 1) }
         fun <T> pick(label: Int, values: List<T>, names: List<String>, get: () -> T, set: (T) -> Unit) =
             Opt(s(label), names, { values.indexOf(get()).coerceAtLeast(0) }) { set(values[it]) }
         val langs = listOf("", "en", "fr", "es", "ja", "ko", "zh-CN", "zh-TW")
         val langNames = listOf(s(R.string.lang_system), "English", "Français", "Español", "日本語", "한국어", "简体中文", "繁體中文")
-        val restart = setOf(0, 1)
-        val opts = listOf(
+        return listOf(
             pick(R.string.theme, listOf(0, 1, 2), listOf(s(R.string.theme_dark), s(R.string.theme_light), s(R.string.theme_glass)), { Prefs.theme }) { Prefs.theme = it },
             pick(R.string.language, langs, langNames, { Prefs.language }) { Prefs.language = it },
             pick(R.string.undo_size, listOf(50, 200, 500, 1000), listOf("50", "200", "500", "1000"), { Prefs.undoLimit }) { Prefs.undoLimit = it },
@@ -865,13 +975,57 @@ class MainActivity : Activity(), BoardView.Host {
                 board.setScene(board.scene) // reload images at the new size
             },
         )
-        choose(s(R.string.settings), opts.map { "${it.label}: ${it.values[it.get()]}" }) { i ->
-            val o = opts[i]
-            choose(o.label, o.values) { v ->
-                o.set(v)
-                if (i in restart) recreate() else { board.invalidate(); showSettings() }
+    }
+
+    /** Settings list, plus export / import of all settings as a file (PureRef 2). */
+    private fun showSettings() {
+        val opts = settingsOpts()
+        val extra = listOf(s(R.string.export_settings), s(R.string.import_settings))
+        choose(s(R.string.settings), opts.map { "${it.label}: ${it.values[it.get()]}" } + extra) { i ->
+            when (i - opts.size) {
+                0 -> create(REQ_SETTINGS_OUT, "application/json", "droref-settings.json")
+                1 -> startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE), REQ_SETTINGS_IN)
+                else -> editSetting(i, opts[i], reopen = true)
             }
         }
+    }
+
+    private fun editSetting(i: Int, o: Opt, reopen: Boolean) = choose(o.label, o.values) { v ->
+        o.set(v)
+        if (i <= 1) recreate() else { board.invalidate(); if (reopen) showSettings() } // theme, language need a restart
+    }
+
+    /** Search every command: menus, the current bar, settings (PureRef's command palette). */
+    private fun palette() {
+        val opts = settingsOpts()
+        val all = (barEntries + menuEntries).distinctBy { it.first } +
+            opts.mapIndexed { i, o -> "${s(R.string.settings)} › ${o.label}" to { editSetting(i, o, reopen = false) } }
+        var shown = all
+        val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_list_item_1, ArrayList(all.map { it.first }))
+        val input = EditText(this).apply { hint = s(R.string.search_hint); isSingleLine = true }
+        val list = android.widget.ListView(this).apply { this.adapter = adapter }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 16, 32, 0)
+            addView(input)
+            addView(list, LinearLayout.LayoutParams(-1, (resources.displayMetrics.heightPixels * 0.5f).toInt()))
+        }
+        val dlg = AlertDialog.Builder(this).setTitle(R.string.command_palette).setView(box).create()
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(e: Editable) {
+                val q = e.toString().trim().lowercase()
+                shown = all.filter { it.first.lowercase().contains(q) }
+                adapter.clear()
+                adapter.addAll(shown.map { it.first })
+            }
+            override fun beforeTextChanged(t: CharSequence, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(t: CharSequence, a: Int, b: Int, c: Int) {}
+        })
+        input.setOnEditorActionListener { _, _, _ -> shown.firstOrNull()?.let { dlg.dismiss(); it.second() }; true }
+        list.setOnItemClickListener { _, _, i, _ -> dlg.dismiss(); shown[i].second() }
+        dlg.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        dlg.show()
+        input.requestFocus()
     }
 
     // ---- keyboard (tablets, Chromebooks); PureRef's shortcuts where they make sense
@@ -883,6 +1037,9 @@ class MainActivity : Activity(), BoardView.Host {
             ctrl && code == KeyEvent.KEYCODE_Z -> if (shift) board.redo() else board.undo()
             ctrl && code == KeyEvent.KEYCODE_Y -> board.redo()
             ctrl && code == KeyEvent.KEYCODE_V -> paste()
+            ctrl && code == KeyEvent.KEYCODE_C -> copyItems()
+            ctrl && code == KeyEvent.KEYCODE_X -> if (board.copySelection()) { markClipboard(); board.delete() }
+            ctrl && shift && code == KeyEvent.KEYCODE_P -> palette()
             ctrl && code == KeyEvent.KEYCODE_A -> board.selectAll()
             ctrl && code == KeyEvent.KEYCODE_D && shift -> if (board.drawing) board.stopDrawing() else board.startDrawing()
             ctrl && code == KeyEvent.KEYCODE_D -> board.duplicate()
@@ -931,10 +1088,10 @@ class MainActivity : Activity(), BoardView.Host {
         AlertDialog.Builder(this).setTitle(title).setItems(items.toTypedArray()) { _, w -> f(w) }.show()
     }
 
-    private fun editText(title: String, initial: String, f: (String) -> Unit) {
+    private fun editText(title: String, initial: String, allowEmpty: Boolean = false, f: (String) -> Unit) {
         val input = EditText(this).apply { setText(initial); setSelection(text.length) }
         AlertDialog.Builder(this).setTitle(title).setView(input)
-            .setPositiveButton(R.string.ok) { _, _ -> input.text.toString().takeIf { it.isNotBlank() }?.let(f) }
+            .setPositiveButton(R.string.ok) { _, _ -> input.text.toString().takeIf { allowEmpty || it.isNotBlank() }?.let(f) }
             .setNegativeButton(R.string.cancel, null).show()
             .window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
         input.requestFocus()

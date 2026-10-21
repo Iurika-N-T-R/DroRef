@@ -3,6 +3,8 @@ package org.droref
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.Configuration
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.Locale
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
@@ -69,6 +71,30 @@ object Prefs {
     var ovH by int("ovH", 900)
     var ovAlpha by float("ovAlpha", 1f)
     var ovBg by int("ovBg", 0)                    // 0 solid, 1 glass, 2 none (overlay mode)
+
+    /** All settings as JSON, for moving them to another device (PureRef 2's settings export). */
+    fun exportJson(): String = JSONObject().apply {
+        sp.all.filterKeys { it != "scene" }.forEach { (k, v) ->
+            put(k, JSONArray().put(when (v) { is Int -> "i"; is Boolean -> "b"; is Float -> "f"; is Long -> "l"; else -> "s" }).put(v))
+        }
+    }.toString(2)
+
+    fun importJson(json: String) {
+        val o = JSONObject(json)
+        val e = sp.edit()
+        for (k in o.keys()) {
+            if (k == "scene") continue
+            val a = o.getJSONArray(k)
+            when (a.getString(0)) {
+                "i" -> e.putInt(k, a.getInt(1))
+                "b" -> e.putBoolean(k, a.getBoolean(1))
+                "f" -> e.putFloat(k, a.getDouble(1).toFloat())
+                "l" -> e.putLong(k, a.getLong(1))
+                else -> e.putString(k, a.getString(1))
+            }
+        }
+        e.apply()
+    }
 
     fun canvasColor() = if (theme == 1) 0xFFE4E4E4.toInt() else 0xFF2B2B2B.toInt()
 }

@@ -63,7 +63,7 @@ class Painter {
 
     fun layout(it: Item): StaticLayout {
         if (layouts.size > 300) layouts.clear()
-        return layouts.getOrPut("${it.textColor}|${it.spans}|${it.text}") { noteLayout(it.text, it.spans, it.textColor, text) }
+        return layouts.getOrPut("${it.textColor}|${it.noteWidth}|${it.spans}|${it.text}") { noteLayout(it.text, it.spans, it.textColor, text, it.noteWidth) }
     }
 
     /** Content only, in content coords. */
@@ -441,6 +441,45 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     }
 
     fun unparent(item: Item) = apply(listOf(item.copy(parent = 0)))
+
+    /** Parents [item] to [parentId], refusing loops (an item can't go under its own child). */
+    fun setParent(item: Item, parentId: Long) {
+        if (parentId in withDescendants(listOf(item.id))) return
+        apply(listOf(item.copy(parent = parentId)))
+    }
+
+    // ---- copy / cut / paste items
+
+    fun copySelection(): Boolean {
+        val ids = withDescendants(selection)
+        if (ids.isEmpty()) return false
+        Boards.clip = scene.items.filter { it.id in ids }
+        Boards.clipImages = scene.images
+        return true
+    }
+
+    fun cutSelection() { if (copySelection()) delete() }
+
+    /** Pastes copied items at the center of the view; image files come along when pasting into another scene. */
+    fun pasteItems() {
+        val clip = Boards.clip.ifEmpty { return }
+        val src = Boards.clipImages
+        if (src != null && src != scene.images) for (f in clip.map { it.file }.filter { it.isNotEmpty() }.distinct()) {
+            val from = File(src, f)
+            val to = File(scene.images, f)
+            if (from.exists() && !to.exists()) from.copyTo(to)
+        }
+        val map = clip.associate { it.id to scene.newId() }
+        val roots = clip.filter { it.parent !in map }
+        val r = roots.union()
+        val c = toBoard(viewW() / 2f, viewH() / 2f)
+        val copies = clip.map { it.copy(id = map.getValue(it.id), parent = map[it.parent] ?: 0L).moveBy(c[0] - r.centerX(), c[1] - r.centerY()) }
+        scene.checkpoint()
+        scene.items += copies
+        selection.clear()
+        roots.mapTo(selection) { map.getValue(it.id) }
+        commit()
+    }
 
     /** Moves an item up or down among its siblings (hierarchy order = layer order). */
     fun moveAmongSiblings(item: Item, d: Int) {
@@ -842,6 +881,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
                 c.restore()
             }
         }
+        for (it in scene.items) if (it.comment.isNotEmpty()) commentBadge(c, it)
         stroke?.takeIf { it.size >= 2 && Prefs.penTool != T_ERASER }?.let { pts ->
             val p = pts.toFloatArray()
             val tool = Prefs.penTool
@@ -857,6 +897,19 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         }
         vids.keys.filter { it !in live }.forEach { vids.remove(it)?.release() }
         if (animating) postInvalidateOnAnimation()
+    }
+
+    private val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFC107.toInt() }
+    private val badgeDot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF333333.toInt() }
+
+    /** Little speech bubble on the top-right corner of commented items (board coords, screen-sized). */
+    private fun commentBadge(c: Canvas, it: Item) {
+        val b = it.bounds() // on screen top-right, whatever the item's rotation or flip
+        val p = floatArrayOf(b.right, b.top)
+        val k = 1f / camScale()
+        val r = 9 * dp * k
+        c.drawCircle(p[0], p[1], r, badge)
+        for (d in -1..1) c.drawCircle(p[0] + d * r * 0.45f, p[1], r * 0.14f, badgeDot)
     }
 
     private fun drawGrid(c: Canvas) {

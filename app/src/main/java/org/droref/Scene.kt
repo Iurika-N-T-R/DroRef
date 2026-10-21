@@ -11,6 +11,10 @@ import java.util.UUID
 /** The scene on screen, shared by the main screen and the floating window (same process, same object). */
 object Boards {
     var scene: Scene? = null
+
+    // DroRef's own clipboard for board items (copy/cut/paste, also between scenes)
+    var clip: List<Item> = emptyList()
+    var clipImages: java.io.File? = null
 }
 
 /** A board: items, camera, undo history. Lives in its own folder: scene.json + images/. */

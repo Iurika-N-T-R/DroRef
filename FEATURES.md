@@ -1,6 +1,6 @@
 # DroRef vs PureRef 2.1
 
-Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/) and PureRef's own menu names.
+Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), the [PureRef 2 announcement](https://www.pureref.com/blog/pureref2/) and PureRef's own menu names.
 ✅ done · 🔜 not yet · ➖ desktop-only (Android alternative in brackets)
 
 ## Adding
@@ -15,6 +15,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/) a
 - ✅ Crop (handles + move) · ✅ reset cropping · 🔜 pan / zoom the image inside the crop
 - ✅ Flip horizontal / vertical · ✅ reset transform · ✅ opacity · ✅ toggle grayscale · ✅ bilinear / nearest sampling
 - ✅ Lock / unlock · ✅ send to back / bring to front · ✅ replace image · ✅ open source · ✅ rename
+- ✅ Copy / cut / paste items (Ctrl+C / X / V), also between scenes · ✅ image comments (badge on the image, shown when selected)
 - 🔜 Axis-snapped and neighbor-snapped move · ➖ relink missing images (always embedded)
 
 ## Arrange & align
@@ -26,7 +27,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/) a
 - ✅ Group (Ctrl+G) / ungroup (Ctrl+Shift+G) · ✅ group background color · ✅ groups resize to fit, empty groups vanish
 - ✅ Locked groups: tapping a child selects the group, double-tap opens it · ✅ drag items into / out of groups
 - ✅ Parent (P) / unparent: children move with and draw above their parent
-- ✅ Hierarchy (Ctrl+J): tree, tap to focus, long-press to rename / reorder / unparent / lock / delete
+- ✅ Hierarchy (Ctrl+J): tree, tap to focus, long-press to rename / reorder / parent to… / unparent / lock / delete
 
 ## Navigation & canvas
 - ✅ Pan, pinch zoom, mouse wheel · ✅ double-tap focus (again = back) · ✅ focus canvas · ✅ next / previous
@@ -35,10 +36,10 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/) a
 - ✅ Slideshow (Alt+S): interval and order (ordered / shuffle / random) in settings; panning pauses it
 
 ## Notes
-- ✅ Rich text: bold, italic, underline, strikethrough, size, color, highlight, font, alignment, bullets
+- ✅ Rich text: bold, italic, underline, strikethrough, size, color, highlight, font, alignment, bullets, numbered lists, indenting
 - ✅ Checklists (tap a box on a selected note to tick it) · ✅ links (tap to open) · ✅ auto size · ✅ color presets
 - ✅ New note parents to the selected item; auto-parent pasted notes (setting)
-- 🔜 Comments on images · 🔜 manual note width · 🔜 justify
+- ✅ Auto size or fixed wrap width (narrow / medium / wide) · 🔜 justify
 
 ## Drawing
 - ✅ Pen, line, rectangle, ellipse, eraser · ✅ color, width, solid / dotted / arrow
@@ -46,7 +47,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/) a
 - 🔜 Shift-style constraints (straight angles, squares, circles)
 
 ## GIF & video
-- ✅ GIF: play / pause, frame step, scrub, speed, frame → image
+- ✅ GIF: play / pause, frame step with frame number, scrub, speed, frame → image, several GIFs at once
 - ✅ Video loops (from AnimRef): muted, A–B loop, speed, frame → image; crop / rotate / fade like images (Android 10+, older shows a still)
 - ➖ YouTube embeds
 
@@ -55,16 +56,18 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/) a
 - ✅ Legacy format, which PureRef 2.1.3 opens (checked with PureRef's own `exportScene`). Drawings are saved as images, videos as a still, groups flattened.
 - ✅ From PureRef 2: *Save as → Legacy PureRef scene*, then open it here · 🔜 PureRef 2 native format (not public)
 - ✅ My scenes: new / open / rename / duplicate / delete, always autosaved, last one reopens
-- ✅ Export scene or selection as PNG · ✅ export images as files (originals when uncropped)
+- ✅ Export scene or selection as PNG · ✅ export images as files: originals when uncropped, cropped ones as PNG or JPG
 
 ## Window modes
 - ✅ Always on top: a floating window over any app, moved / resized from its bar, its own camera
 - ✅ Overlay mode (background solid / glass / none) · ✅ app opacity (100 / 80 / 60 / 40 %) · ✅ transparent to touch (tracing)
-- ➖ Always on bottom, lock window, title bar, tray icon, file associations, global shortcuts, SpaceMouse
+- ➖ Always on top *of* one app, always on bottom, lock window, title bar, tray icon, file associations, global shortcuts, SpaceMouse
 
 ## Settings, themes, languages
 - ✅ Settings: theme, language, undo size, pack new (and by what), bring to front, double-tap focus, image borders,
   alignment padding, default sampling, slideshow interval / order, drag into groups, auto-parent notes, image quality
 - ✅ Themes: dark / light / glass · ✅ English, Français, Español, 日本語, 한국어, 简体中文, 繁體中文 (PureRef's set)
+- ✅ Command palette (Ctrl+Shift+P): search and run every command, bar action and setting
+- ✅ Export / import all settings as a file
 - ✅ Keyboard shortcuts for tablets / Chromebooks, following PureRef's where they make sense
 - 🔜 Custom theme colors, rebinding shortcuts

@@ -8,6 +8,7 @@ import android.text.style.AlignmentSpan
 import android.text.style.BackgroundColorSpan
 import android.text.style.BulletSpan
 import android.text.style.ForegroundColorSpan
+import android.text.style.LeadingMarginSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.StrikethroughSpan
 import android.text.style.StyleSpan
@@ -20,6 +21,7 @@ import org.json.JSONArray
 object Rich {
     const val UNCHECKED = '☐'
     const val CHECKED = '☑'
+    const val INDENT = 32
 
     fun build(text: String, json: String): SpannableStringBuilder {
         val s = SpannableStringBuilder(text)
@@ -46,6 +48,7 @@ object Rich {
         "url" -> URLSpan(v)
         "align" -> AlignmentSpan.Standard(Layout.Alignment.values()[v.toInt()])
         "bullet" -> BulletSpan(16)
+        "indent" -> LeadingMarginSpan.Standard(v.toInt() * INDENT)
         "font" -> TypefaceSpan(v)
         else -> null
     }
@@ -61,6 +64,7 @@ object Rich {
         is URLSpan -> listOf("url")
         is AlignmentSpan -> listOf("align")
         is BulletSpan -> listOf("bullet")
+        is LeadingMarginSpan.Standard -> listOf("indent")
         is TypefaceSpan -> if (sp.family != null) listOf("font") else emptyList()
         else -> emptyList()
     }
@@ -72,6 +76,7 @@ object Rich {
         is URLSpan -> sp.url
         is AlignmentSpan -> sp.alignment.ordinal.toString()
         is TypefaceSpan -> sp.family.orEmpty()
+        is LeadingMarginSpan.Standard -> (sp.getLeadingMargin(true) / INDENT).toString()
         else -> ""
     }
 
