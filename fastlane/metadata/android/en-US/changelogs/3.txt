@@ -1,0 +1,1 @@
+Keyboard and mouse: PureRef's default shortcuts and mouse controls (left-drag selects, Ctrl-drag rotates, Ctrl+Alt-drag scales, middle or right-drag pans, right-click menu), touchpad pan and zoom, Ctrl+H lists every shortcut. My scenes is now a grid of previews with folders.

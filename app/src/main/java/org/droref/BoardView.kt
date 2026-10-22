@@ -27,6 +27,8 @@ import android.text.TextPaint
 import android.text.style.URLSpan
 import android.view.GestureDetector
 import android.view.HapticFeedbackConstants
+import android.view.InputDevice
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -38,10 +40,12 @@ import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
@@ -181,6 +185,9 @@ fun renderItems(items: List<Item>, images: File, maxSide: Int, gray: Boolean): B
  * Tap selects, long-press an item adds/removes it from the selection,
  * long-press empty space then drag draws a selection rectangle (release without dragging = canvas menu).
  * Double-tap focuses an item (again = back), opens a closed group, edits a note or drawing.
+ * Mouse, as in PureRef: left-drag on empty space selects (Shift adds), Shift-click adds an item, Shift-drag moves in straight lines,
+ * Ctrl-drag rotates, Ctrl+Alt-drag scales, middle / right / Alt-drag pans, right-click opens the menu, wheel zooms.
+ * Touchpad: two-finger swipe pans, pinch zooms, Ctrl + swipe zooms.
  */
 class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : View(ctx) {
     interface Host {
@@ -189,6 +196,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         fun canvasMenu()
         fun picked(info: String, hex: String)
         fun editItem(item: Item)
+        fun itemMenu() {} // right-click on an item
     }
 
     class Src(val name: String, val source: String, val open: () -> InputStream?)
@@ -223,7 +231,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x30808080; strokeCap = Paint.Cap.ROUND }
 
     // gesture state
-    private enum class G { NONE, CAMERA, ITEMS, RUBBER, CROP, PICK, DRAW }
+    private enum class G { NONE, CAMERA, ITEMS, RUBBER, CROP, PICK, DRAW, ROTATE, SCALE }
     private var g = G.NONE
     private var downHit: Item? = null
     private var moved = false
@@ -239,6 +247,17 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     private var beforeFocus: FloatArray? = null
     private var lastArrange = ""
     private var entered = -1L // closed group opened by double-tap
+
+    // mouse and touchpad (PureRef's controls)
+    private var mouse = false
+    private var pad = false // touchpad two-finger swipe or pinch: always the camera
+    private var shift = false
+    private var ctrl = false
+    private var rightClick = false
+    private var axis = 0 // Shift-drag: 1 horizontal, 2 vertical
+    private var pivot = FloatArray(2) // board coords, for Ctrl-drag rotate / Ctrl+Alt-drag scale
+    private var turned = 0f
+    private var scaled = 1f
 
     // drawing
     var drawing = false
@@ -796,6 +815,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         focus(listOf(n))
     }
 
+    fun zoomBy(k: Float) { zoomAt(viewW() / 2f, viewH() / 2f, k); invalidate(); scene.save() }
     fun resetZoom() { val s = camScale(); cam.postScale(1 / s, 1 / s, viewW() / 2f, viewH() / 2f); focused = null; invalidate(); scene.save() }
     fun resetCamera() { cam.reset(); focused = null; invalidate(); scene.save() }
 
@@ -993,6 +1013,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     override fun onTouchEvent(e: MotionEvent): Boolean {
         gestures.onTouchEvent(e)
         when (e.actionMasked) {
+            MotionEvent.ACTION_BUTTON_PRESS, MotionEvent.ACTION_BUTTON_RELEASE -> return true
             MotionEvent.ACTION_DOWN -> down(e)
             MotionEvent.ACTION_POINTER_DOWN -> {
                 if (g == G.DRAW) { stroke = null; g = G.CAMERA; moved = true } // second finger while drawing = pan/zoom
@@ -1010,17 +1031,33 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
 
     override fun onGenericMotionEvent(e: MotionEvent): Boolean {
         if (e.actionMasked != MotionEvent.ACTION_SCROLL) return super.onGenericMotionEvent(e)
-        zoomAt(e.x, e.y, if (e.getAxisValue(MotionEvent.AXIS_VSCROLL) > 0) 1.15f else 1 / 1.15f)
+        zoomAt(e.x, e.y, 1.15f.pow(e.getAxisValue(MotionEvent.AXIS_VSCROLL))) // touchpads send fractions
         invalidate()
         return true
+    }
+
+    private fun MotionEvent.has(meta: Int) = metaState and meta != 0
+
+    private fun touchpadGesture(e: MotionEvent) = Build.VERSION.SDK_INT >= 34 && e.classification.let {
+        it == MotionEvent.CLASSIFICATION_TWO_FINGER_SWIPE || it == MotionEvent.CLASSIFICATION_PINCH
     }
 
     private fun down(e: MotionEvent) {
         downX = e.x; downY = e.y
         moved = false
         last = gesture(e, -1)
+        pad = touchpadGesture(e)
+        mouse = !pad && e.isFromSource(InputDevice.SOURCE_MOUSE)
+        shift = e.has(KeyEvent.META_SHIFT_ON)
+        ctrl = e.has(KeyEvent.META_CTRL_ON)
+        val b = e.buttonState
+        rightClick = mouse && b and MotionEvent.BUTTON_SECONDARY != 0
+        axis = 0
         g = when {
             picking -> { pick(e.x, e.y); G.PICK }
+            pad -> G.CAMERA
+            // middle button, right button or Alt + left: pan, everywhere (also while drawing or cropping)
+            mouse && (b and (MotionEvent.BUTTON_SECONDARY or MotionEvent.BUTTON_TERTIARY) != 0 || e.has(KeyEvent.META_ALT_ON) && !ctrl && !shift) -> G.CAMERA
             drawing -> {
                 erasedOnce = false
                 if (Prefs.penTool == T_ERASER) erase(e.x, e.y) else stroke = arrayListOf<Float>().also { toBoard(e.x, e.y).forEach(it::add) }
@@ -1029,7 +1066,13 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
             cropId >= 0 -> if (cropDown(e.x, e.y)) G.CROP else G.CAMERA
             else -> {
                 downHit = if (Prefs.canvasLocked || viewOnly) null else hit(e.x, e.y)
-                if (downHit != null) G.ITEMS else G.CAMERA
+                when {
+                    !mouse -> if (downHit != null) G.ITEMS else G.CAMERA
+                    downHit != null && ctrl -> if (e.has(KeyEvent.META_ALT_ON)) G.SCALE else G.ROTATE
+                    downHit != null -> G.ITEMS
+                    Prefs.canvasLocked || viewOnly -> G.CAMERA
+                    else -> { rubberOn = true; rubber.set(e.x, e.y, e.x, e.y); G.RUBBER } // left-drag on empty space selects, like PureRef
+                }
             }
         }
     }
@@ -1037,13 +1080,15 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     private fun startMove() {
         if (moved) return
         moved = true
-        if (g != G.ITEMS) return
+        if (g != G.ITEMS && g != G.ROTATE && g != G.SCALE) return
         val h = downHit ?: return
         if (h.id !in selection) select(listOf(h))
         if (Prefs.bringToFront) bringSelectionToFront()
         scene.checkpoint()
         val ids = withDescendants(selected().filter { !it.locked }.map { it.id })
         raw = HashMap(scene.items.filter { it.id in ids }.associateBy { it.id })
+        raw.values.toList().union().let { pivot = floatArrayOf(it.centerX(), it.centerY()) }
+        turned = 0f; scaled = 1f
     }
 
     private fun move(e: MotionEvent) {
@@ -1060,6 +1105,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
                 if (Prefs.penTool == T_PEN) { s += p[0]; s += p[1] } else { while (s.size > 2) s.removeAt(s.size - 1); s += p[0]; s += p[1] }
             }
             G.CAMERA, G.ITEMS -> transform(e)
+            G.ROTATE, G.SCALE -> turnOrScale(e)
             G.NONE -> {}
         }
     }
@@ -1067,9 +1113,14 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     private fun transform(e: MotionEvent) {
         val n = gesture(e, -1)
         val multi = e.pointerCount > 1
-        val dx = n[0] - last[0]
-        val dy = n[1] - last[1]
-        val ds = if (multi && last[2] > 0f) n[2] / last[2] else 1f
+        var dx = n[0] - last[0]
+        var dy = n[1] - last[1]
+        var ds = if (multi && last[2] > 0f) n[2] / last[2] else 1f
+        if (pad && ctrl && !multi) { ds = exp(dy / (200 * dp)); dx = 0f; dy = 0f } // Ctrl + two-finger swipe zooms
+        if (mouse && shift && g == G.ITEMS) { // Shift-drag: straight lines
+            if (axis == 0) axis = if (abs(n[0] - downX) >= abs(n[1] - downY)) 1 else 2
+            if (axis == 1) dy = 0f else dx = 0f
+        }
         var dr = if (multi) n[3] - last[3] else 0f
         if (dr > 180) dr -= 360
         if (dr < -180) dr += 360
@@ -1087,6 +1138,27 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         scene.items.replaceAll { item -> raw[item.id]?.let { if (single) it.copy(rot = snapAngle(it.rot)) else it } ?: item }
     }
 
+    /** Mouse: Ctrl-drag rotates around the selection's center (Ctrl+Shift: 45° steps), Ctrl+Alt-drag scales (right = bigger). */
+    private fun turnOrScale(e: MotionEvent) {
+        val c = floatArrayOf(pivot[0], pivot[1]).also(cam::mapPoints)
+        var ds = 1f
+        var dr = 0f
+        if (g == G.ROTATE) {
+            fun ang(x: Float, y: Float) = Math.toDegrees(atan2((y - c[1]).toDouble(), (x - c[0]).toDouble())).toFloat()
+            var total = ang(e.x, e.y) - ang(downX, downY)
+            if (e.has(KeyEvent.META_SHIFT_ON)) total = (total / 45f).roundToInt() * 45f
+            dr = total - turned
+            turned = total
+        } else {
+            // ponytail: 150dp of drag doubles or halves; make it a setting if it feels wrong on big screens
+            val total = 2f.pow((e.x - downX) / (150 * dp)).coerceIn(0.02f, 50f)
+            ds = total / scaled
+            scaled = total
+        }
+        raw.replaceAll { _, it -> it.transformed(pivot[0], pivot[1], ds, dr, 0f, 0f) }
+        scene.items.replaceAll { item -> raw[item.id] ?: item }
+    }
+
     // sticks to multiples of 45° when within 4°
     private fun snapAngle(r: Float): Float {
         val n = (r / 45f).roundToInt() * 45f
@@ -1095,19 +1167,43 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
 
     private fun up(e: MotionEvent) {
         when (g) {
-            G.ITEMS -> if (!moved) downHit?.let { tap(it, e.x, e.y) } else {
-                if (Prefs.snap) snapToGrid()
-                dropIntoGroups()
+            G.ITEMS, G.ROTATE, G.SCALE -> if (!moved) downHit?.let { if (mouse && shift) toggle(it) else tap(it, e.x, e.y) } else {
+                if (Prefs.snap && g == G.ITEMS) snapToGrid()
+                if (g == G.ITEMS) dropIntoGroups()
                 commit()
             }
-            G.CAMERA -> if (!moved) { if (selection.isNotEmpty() || entered >= 0) clearSelection() } else scene.save()
-            G.RUBBER -> { rubberOn = false; if (moved) selectRubber() else host?.canvasMenu() }
+            G.CAMERA -> when {
+                moved -> scene.save()
+                rightClick -> if (!drawing) contextMenu(e.x, e.y)
+                selection.isNotEmpty() || entered >= 0 -> clearSelection()
+            }
+            G.RUBBER -> {
+                rubberOn = false
+                when {
+                    moved -> selectRubber(add = mouse && shift)
+                    mouse -> if (!shift) clearSelection()
+                    else -> host?.canvasMenu()
+                }
+            }
             G.CROP -> scene.save()
             G.DRAW -> if (Prefs.penTool == T_ERASER) { if (erasedOnce) commit() } else finishStroke()
             G.PICK, G.NONE -> {}
         }
         g = G.NONE
         raw.clear()
+    }
+
+    /** Right-click: the item's menu (selecting it first), or the canvas menu on empty space. */
+    private fun contextMenu(sx: Float, sy: Float) {
+        val h = hit(sx, sy) ?: return run { host?.canvasMenu() }
+        if (h.id !in selection) select(listOf(h))
+        host?.itemMenu()
+    }
+
+    private fun toggle(it: Item) {
+        if (!selection.remove(it.id)) selection += it.id
+        invalidate()
+        host?.selectionChanged()
     }
 
     private fun tap(it: Item, sx: Float, sy: Float) {
@@ -1136,7 +1232,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     }
 
     private fun doubleTap(e: MotionEvent): Boolean {
-        if (picking || cropId >= 0 || drawing) return false
+        if (picking || cropId >= 0 || drawing || rightClick) return false
         val raw = hitRaw(e.x, e.y)
         val top = raw?.let(::resolve)
         if (viewOnly) { if (raw == null) focusAll() else focus(listOf(top ?: raw)); return true }
@@ -1150,19 +1246,14 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     }
 
     private fun longPress(e: MotionEvent) {
-        if (moved || picking || cropId >= 0 || drawing || viewOnly || g == G.NONE) return
+        if (moved || mouse || pad || picking || cropId >= 0 || drawing || viewOnly || g == G.NONE) return
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
         val any = hitAny(e.x, e.y)
         val h = downHit
         when {
             any != null && any.locked && h == null -> { g = G.NONE; host?.lockedPressed(any) }
             h != null && selection.size == 1 && h.id in selection && h.isMedia && dragOut(h) -> g = G.NONE
-            h != null -> {
-                if (!selection.remove(h.id)) selection += h.id
-                g = G.NONE
-                invalidate()
-                host?.selectionChanged()
-            }
+            h != null -> { toggle(h); g = G.NONE }
             Prefs.canvasLocked -> { g = G.NONE; host?.canvasMenu() }
             else -> { g = G.RUBBER; rubberOn = true; rubber.set(e.x, e.y, e.x, e.y) }
         }
@@ -1182,11 +1273,12 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         return startDragAndDrop(clip, ThumbShadow(thumb, (160 * dp).toInt()), DRAG_SELF, DRAG_FLAG_GLOBAL or DRAG_FLAG_GLOBAL_URI_READ)
     }
 
-    private fun selectRubber() {
+    private fun selectRubber(add: Boolean = false) {
         val a = toBoard(min(rubber.left, rubber.right), min(rubber.top, rubber.bottom))
         val b = toBoard(max(rubber.left, rubber.right), max(rubber.top, rubber.bottom))
         val r = RectF(a[0], a[1], b[0], b[1])
-        select(scene.items.filter { !it.locked && RectF.intersects(r, it.bounds()) }.map(::resolve).distinctBy { it.id })
+        val hits = scene.items.filter { !it.locked && RectF.intersects(r, it.bounds()) }.map(::resolve)
+        select((if (add) selected() + hits else hits).distinctBy { it.id })
     }
 
     private fun snapToGrid() {

@@ -21,6 +21,7 @@ object Boards {
 class Scene private constructor(val dir: File) {
     var name = "Untitled"
     var purUri = "" // the .pur file "Save" writes to
+    var folder = "" // "" = not in a folder (scene browser)
     val items = mutableListOf<Item>()
     val cam = Matrix() // board -> screen
     val images = File(dir, "images").apply { mkdirs() }
@@ -51,7 +52,7 @@ class Scene private constructor(val dir: File) {
 
     fun save() {
         val v = FloatArray(9).also(cam::getValues)
-        val o = JSONObject().put("name", name).put("nextId", nextId).put("purUri", purUri)
+        val o = JSONObject().put("name", name).put("nextId", nextId).put("purUri", purUri).put("folder", folder)
             .put("camera", JSONArray(v.map { it.toDouble() }))
             .put("items", JSONArray(items.map { it.toJson() }))
         val out = json.startWrite()
@@ -61,6 +62,24 @@ class Scene private constructor(val dir: File) {
         } catch (e: Exception) {
             json.failWrite(out) // keep the previous good file
         }
+    }
+
+    /** Saves without looking edited (moving to a folder isn't an edit). */
+    fun saveKeepTime() {
+        val t = File(dir, "scene.json").lastModified()
+        save()
+        File(dir, "scene.json").setLastModified(t)
+    }
+
+    val thumb get() = File(dir, "thumb.jpg")
+    val edited get() = File(dir, "scene.json").lastModified()
+
+    /** Small preview for the scene browser; [items] copied on the UI thread, this runs on a background one. */
+    fun writeThumb(items: List<Item>) {
+        if (items.isEmpty()) { thumb.delete(); return }
+        val b = renderItems(items, images, 640, false)
+        runCatching { thumb.outputStream().use { b.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it) } }
+        b.recycle()
     }
 
     fun copy(ctx: Context, newName: String): Scene {
@@ -73,6 +92,7 @@ class Scene private constructor(val dir: File) {
         val o = runCatching { JSONObject(String(json.readFully())) }.getOrNull() ?: return
         name = o.optString("name", name)
         purUri = o.optString("purUri")
+        folder = o.optString("folder")
         nextId = o.optLong("nextId", 1)
         o.optJSONArray("camera")?.let { c -> cam.setValues(FloatArray(9) { c.getDouble(it).toFloat() }) }
         val a = o.getJSONArray("items")
@@ -93,7 +113,7 @@ class Scene private constructor(val dir: File) {
         /** Read-only look, e.g. for listing names. */
         fun peek(dir: File) = Scene(dir).apply { load(clean = false) }
         fun create(ctx: Context, name: String) = Scene(File(root(ctx), UUID.randomUUID().toString())).apply { this.name = name; save() }
-        fun list(ctx: Context) = root(ctx).listFiles().orEmpty()
+        fun list(ctx: Context): List<File> = root(ctx).listFiles().orEmpty()
             .filter { File(it, "scene.json").exists() }
             .sortedByDescending { File(it, "scene.json").lastModified() }
 

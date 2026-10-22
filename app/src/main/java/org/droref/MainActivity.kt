@@ -26,6 +26,8 @@ import android.text.style.RelativeSizeSpan
 import android.view.DragEvent
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.KeyboardShortcutGroup
+import android.view.KeyboardShortcutInfo
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -271,15 +273,25 @@ class MainActivity : Activity(), BoardView.Host {
 
     private fun remember(sc: Scene) {
         Boards.scene = sc
+        if (Prefs.scene != sc.dir.name) Prefs.prevScene = Prefs.scene
         Prefs.scene = sc.dir.name
         title = sc.name
         titleView.text = sc.name
     }
 
     private fun switchTo(sc: Scene) {
-        board.scene.save()
+        val old = board.scene
+        old.save()
+        val items = old.items.toList()
+        if (old.dir.exists()) thread { old.writeThumb(items) } // the scene browser's preview
         board.setScene(sc)
         remember(sc)
+    }
+
+    /** Ctrl+Shift+L: back to the scene used before this one. */
+    private fun previousScene() {
+        val d = File(Scene.root(this), Prefs.prevScene)
+        if (Prefs.prevScene.isNotEmpty() && File(d, "scene.json").exists()) switchTo(Scene.open(d))
     }
 
     // ---- the main panel: actions grouped by purpose, settings and search apart
@@ -328,6 +340,7 @@ class MainActivity : Activity(), BoardView.Host {
     private fun mainSheet() = sheet(board.scene.name, mainSections(), light, listOf(
         Triple(R.drawable.ic_command, s(R.string.command_palette)) { palette() },
         Triple(R.drawable.ic_settings, s(R.string.settings)) { showSettings() },
+        Triple(R.drawable.ic_keyboard, s(R.string.shortcuts)) { requestShowKeyboardShortcuts() },
         Triple(R.drawable.ic_info, s(R.string.about)) { about() },
     ))
 
@@ -843,6 +856,8 @@ class MainActivity : Activity(), BoardView.Host {
         ))), light)
     }
 
+    override fun itemMenu() { moreSheet() }
+
     override fun editItem(item: Item) {
         if (item.type == NOTE) noteEditor(item) else if (item.type == DRAW) board.startDrawing(item)
     }
@@ -930,20 +945,75 @@ class MainActivity : Activity(), BoardView.Host {
 
     // ---- scenes and .pur files
 
+    private var browser: SceneBrowser? = null
+
+    /** The scene browser: previews in a grid, one level of folders. */
     private fun openScene() {
-        board.scene.save()
-        val dirs = Scene.list(this)
-        val names = dirs.map { d -> Scene.peek(d).let { (if (d == board.scene.dir) "• " else "") + "${it.name}  (${it.items.size})" } }
-        choose(s(R.string.my_scenes), names) { if (dirs[it] != board.scene.dir) switchTo(Scene.open(dirs[it])) }
+        browser = SceneBrowser(this, light, { board.scene },
+            open = { d -> if (d != board.scene.dir) switchTo(Scene.open(d)) },
+            sceneMenu = ::sceneMenu,
+            folderMenu = ::folderMenu,
+            newScene = { f -> browser?.dismiss(); switchTo(Scene.create(this, s(R.string.untitled)).apply { folder = f; save() }) },
+            newFolder = { editText(s(R.string.new_folder), "") { n -> addFolder(n.trim()); browser?.refresh() } },
+        ).also { it.show() }
     }
 
-    private fun deleteScene() {
-        AlertDialog.Builder(this).setMessage(s(R.string.delete_scene_q, board.scene.name))
+    /** The scene on screen is edited in place, so its next save doesn't undo the change. */
+    private fun sceneAt(d: File) = if (d == board.scene.dir) board.scene else Scene.peek(d)
+
+    private fun addFolder(name: String) { if (name.isNotEmpty() && name !in Prefs.folders.lines()) Prefs.folders = (Prefs.folders.lines() + name).filter { it.isNotEmpty() }.joinToString("\n") }
+
+    private fun sceneMenu(d: File) {
+        val sc = sceneAt(d)
+        sheet(sc.name, listOf(Section(s(R.string.file), Palette.ORANGE, listOf(
+            Tile(R.drawable.ic_pencil_line, s(R.string.rename)) {
+                editText(s(R.string.scene_name), sc.name) { sc.name = it; sc.saveKeepTime(); if (sc === board.scene) remember(sc); browser?.refresh() }
+            },
+            Tile(R.drawable.ic_folder_input, s(R.string.move_to_folder)) {
+                val folders = (Prefs.folders.lines() + Scene.list(this).map { sceneAt(it).folder }).filter { it.isNotEmpty() }.distinct().sorted()
+                val names = listOf(s(R.string.no_folder)) + folders + s(R.string.new_folder)
+                choose(s(R.string.move_to_folder), names) { i ->
+                    fun move(f: String) { sc.folder = f; sc.saveKeepTime(); browser?.refresh() }
+                    when (i) {
+                        0 -> move("")
+                        names.size - 1 -> editText(s(R.string.new_folder), "") { n -> addFolder(n.trim()); move(n.trim()) }
+                        else -> move(folders[i - 1])
+                    }
+                }
+            },
+            Tile(R.drawable.ic_copy, s(R.string.duplicate_scene)) { sc.save(); sc.copy(this, s(R.string.copy_of, sc.name)); browser?.refresh() },
+            Tile(R.drawable.ic_trash, s(R.string.delete_scene), color = Palette.RED) { deleteScene(d) },
+        ))), light)
+    }
+
+    private fun folderMenu(name: String) {
+        fun each(f: (Scene) -> Unit) = Scene.list(this).map(::sceneAt).filter { it.folder == name }.forEach { f(it); it.saveKeepTime() }
+        sheet(name, listOf(Section(s(R.string.edit), Palette.ORANGE, listOf(
+            Tile(R.drawable.ic_pencil_line, s(R.string.rename_folder)) {
+                editText(s(R.string.folder_name), name) { n ->
+                    val t = n.trim()
+                    Prefs.folders = Prefs.folders.lines().map { if (it == name) t else it }.joinToString("\n")
+                    each { it.folder = t }
+                    browser?.refresh()
+                }
+            },
+            Tile(R.drawable.ic_trash, s(R.string.remove_folder), color = Palette.RED) {
+                Prefs.folders = Prefs.folders.lines().filter { it != name }.joinToString("\n")
+                each { it.folder = "" }
+                browser?.refresh()
+            },
+        ))), light)
+    }
+
+    private fun deleteScene(d: File = board.scene.dir) {
+        AlertDialog.Builder(this).setMessage(s(R.string.delete_scene_q, sceneAt(d).name))
             .setPositiveButton(R.string.delete) { _, _ ->
-                val d = board.scene.dir
-                val next = Scene.list(this).firstOrNull { it != d }?.let { Scene.open(it) } ?: Scene.create(this, s(R.string.untitled))
-                switchTo(next)
+                if (d == board.scene.dir) {
+                    val next = Scene.list(this).firstOrNull { it != d }?.let { Scene.open(it) } ?: Scene.create(this, s(R.string.untitled))
+                    switchTo(next)
+                }
                 d.deleteRecursively()
+                browser?.refresh()
             }
             .setNegativeButton(R.string.cancel, null).show()
     }
@@ -1191,39 +1261,138 @@ class MainActivity : Activity(), BoardView.Host {
         input.requestFocus()
     }
 
-    // ---- keyboard (tablets, Chromebooks); PureRef's shortcuts where they make sense
+    // ---- keyboard (tablets with a keyboard cover, Chromebooks): PureRef's default shortcuts
+
+    /** A shortcut: key + exactly these modifiers (KeyEvent.META_CTRL_ON / SHIFT / ALT), its name in the shortcut list, what it does. */
+    private class Key(val code: Int, val mods: Int, val label: String, val f: () -> Unit)
+
+    private fun flip(h: Boolean) = board.edit { if (h) it.copy(flipX = !it.flipX) else it.copy(flipY = !it.flipY) }
+
+    /** Grouped like PureRef's list. The same table runs the keys and fills Android's shortcut list (Ctrl+H or Meta+/). */
+    private fun keys(): List<Pair<String, List<Key>>> {
+        val C = KeyEvent.META_CTRL_ON
+        val S = KeyEvent.META_SHIFT_ON
+        val A = KeyEvent.META_ALT_ON
+        val sel = board.selection.isNotEmpty()
+        val out = ArrayList<Pair<String, List<Key>>>()
+        if (board.drawing) out += s(R.string.drawing) to listOf(
+            Key(KeyEvent.KEYCODE_D, 0, s(R.string.pen)) { Prefs.penTool = T_PEN; selectionChanged() },
+            Key(KeyEvent.KEYCODE_L, 0, s(R.string.line)) { Prefs.penTool = T_LINE; selectionChanged() },
+            Key(KeyEvent.KEYCODE_R, 0, s(R.string.rectangle)) { Prefs.penTool = T_RECT; selectionChanged() },
+            Key(KeyEvent.KEYCODE_C, 0, s(R.string.ellipse)) { Prefs.penTool = T_ELLIPSE; selectionChanged() },
+            Key(KeyEvent.KEYCODE_E, 0, s(R.string.eraser)) { Prefs.penTool = T_ERASER; selectionChanged() },
+            Key(KeyEvent.KEYCODE_1, 0, s(R.string.solid)) { Prefs.penStyle = S_SOLID },
+            Key(KeyEvent.KEYCODE_2, 0, s(R.string.dotted)) { Prefs.penStyle = S_DOTTED },
+            Key(KeyEvent.KEYCODE_3, 0, s(R.string.arrow)) { Prefs.penStyle = S_ARROW },
+            Key(KeyEvent.KEYCODE_T, C, s(R.string.color)) { pickColor(s(R.string.color), withNone = false, current = Prefs.penColor) { Prefs.penColor = it; selectionChanged() } },
+            Key(KeyEvent.KEYCODE_D, C or S, s(R.string.done)) { board.stopDrawing() },
+        )
+        out += s(R.string.file) to listOf(
+            Key(KeyEvent.KEYCODE_K, C, s(R.string.new_scene)) { switchTo(Scene.create(this, s(R.string.untitled))) },
+            Key(KeyEvent.KEYCODE_L, C or A, s(R.string.my_scenes)) { openScene() },
+            Key(KeyEvent.KEYCODE_L, C or S, s(R.string.recent_scene)) { previousScene() },
+            Key(KeyEvent.KEYCODE_L, C, s(R.string.open_pur)) { openPur() },
+            Key(KeyEvent.KEYCODE_O, C, s(R.string.open_pur)) { openPur() },
+            Key(KeyEvent.KEYCODE_S, C, s(R.string.save)) { save() },
+            Key(KeyEvent.KEYCODE_S, C or S, s(R.string.save_as)) { saveAs() },
+            Key(KeyEvent.KEYCODE_E, C, s(R.string.export_png)) { exportItems = board.scene.items.toList(); create(REQ_PNG, "image/png", "${board.scene.name}.png") },
+            Key(KeyEvent.KEYCODE_I, C or A, s(R.string.export_images)) { exportItems = board.ordered(); exportFiles() },
+            Key(KeyEvent.KEYCODE_I, C or S, s(R.string.as_separate)) { if (sel) { exportItems = selectionWithChildren(); exportFiles() } },
+            Key(KeyEvent.KEYCODE_I, C, s(R.string.add_images)) { pickMedia(REQ_ADD, multiple = true) },
+            Key(KeyEvent.KEYCODE_N, C, s(R.string.add_note)) { noteEditor(null) },
+            Key(KeyEvent.KEYCODE_V, C, s(R.string.paste)) { paste() },
+            Key(KeyEvent.KEYCODE_P, C or S, s(R.string.command_palette)) { palette() },
+            Key(KeyEvent.KEYCODE_U, C, s(R.string.settings)) { showSettings() },
+            Key(KeyEvent.KEYCODE_H, C, s(R.string.shortcuts)) { requestShowKeyboardShortcuts() },
+            Key(KeyEvent.KEYCODE_1, A, s(R.string.theme_dark)) { Prefs.theme = 0; recreate() },
+            Key(KeyEvent.KEYCODE_2, A, s(R.string.theme_light)) { Prefs.theme = 1; recreate() },
+            Key(KeyEvent.KEYCODE_3, A, s(R.string.theme_glass)) { Prefs.theme = 2; recreate() },
+        )
+        out += s(R.string.edit) to listOf(
+            Key(KeyEvent.KEYCODE_Z, C, s(R.string.undo)) { board.undo() },
+            Key(KeyEvent.KEYCODE_Z, C or S, s(R.string.redo)) { board.redo() },
+            Key(KeyEvent.KEYCODE_Y, C, s(R.string.redo)) { board.redo() },
+            Key(KeyEvent.KEYCODE_C, C, s(R.string.copy)) { copyItems() },
+            Key(KeyEvent.KEYCODE_X, C, s(R.string.cut)) { if (board.copySelection()) { markClipboard(); board.delete() } },
+            Key(KeyEvent.KEYCODE_D, C, s(R.string.duplicate)) { board.duplicate() },
+            Key(KeyEvent.KEYCODE_A, C, s(R.string.select_all)) { board.selectAll() },
+            Key(KeyEvent.KEYCODE_FORWARD_DEL, 0, s(R.string.delete)) { board.delete() },
+            Key(KeyEvent.KEYCODE_DEL, 0, s(R.string.delete)) { board.delete() },
+            Key(KeyEvent.KEYCODE_ENTER, 0, s(R.string.edit)) { board.selected().singleOrNull()?.let(::editItem) },
+            Key(KeyEvent.KEYCODE_C, A, s(R.string.comment)) {
+                board.selected().singleOrNull()?.let { one -> editText(s(R.string.comment), one.comment, allowEmpty = true) { c -> board.apply(listOf(one.copy(comment = c.trim()))) } }
+            },
+            Key(KeyEvent.KEYCODE_O, C or S, s(R.string.source)) { board.selected().singleOrNull()?.source?.takeIf { it.startsWith("http") }?.let(::open) },
+            Key(KeyEvent.KEYCODE_D, C or S, s(R.string.draw)) { board.startDrawing() },
+            Key(KeyEvent.KEYCODE_ESCAPE, 0, s(R.string.done)) { back() },
+        )
+        out += s(R.string.transform) to listOf(
+            Key(KeyEvent.KEYCODE_H, A or S, s(R.string.flip_h)) { flip(true) },
+            Key(KeyEvent.KEYCODE_V, A or S, s(R.string.flip_v)) { flip(false) },
+            Key(KeyEvent.KEYCODE_T, C or S, s(R.string.reset)) { board.edit { it.copy(scale = 1f, rot = 0f, flipX = false, flipY = false) } },
+            Key(KeyEvent.KEYCODE_C, C or A or S, s(R.string.crop)) { if (board.selected().singleOrNull()?.isMedia == true) board.startCrop() },
+            Key(KeyEvent.KEYCODE_C, C or S, s(R.string.reset_crop)) { board.resetCrop() },
+            Key(KeyEvent.KEYCODE_G, A, s(R.string.gray)) { val g = board.selected().all { it.gray }; board.edit { it.copy(gray = !g) } },
+            Key(KeyEvent.KEYCODE_T, A, s(R.string.pixelated)) { val px = board.selected().filter { it.isMedia }.all { it.nearest }; board.edit { if (it.isMedia) it.copy(nearest = !px) else it } },
+            Key(KeyEvent.KEYCODE_L, A, s(R.string.lock)) { board.toggleLock() },
+        )
+        out += s(R.string.arrange) to listOf(
+            Key(KeyEvent.KEYCODE_P, C, s(R.string.optimal)) { board.arrange("optimal") },
+            Key(KeyEvent.KEYCODE_N, C or A, s(R.string.by_name)) { board.arrange("name") },
+            Key(KeyEvent.KEYCODE_A, C or A, s(R.string.by_addition)) { board.arrange("addition") },
+            Key(KeyEvent.KEYCODE_O, C or A, s(R.string.by_order)) { board.arrange("order") },
+            Key(KeyEvent.KEYCODE_D, C or A, s(R.string.by_path)) { board.arrange("path") },
+            Key(KeyEvent.KEYCODE_R, C or A, s(R.string.randomly)) { board.arrange("random") },
+            Key(KeyEvent.KEYCODE_S, C or A, s(R.string.stack)) { board.stack() },
+            Key(KeyEvent.KEYCODE_DPAD_LEFT, C, s(R.string.left)) { board.align(0) },
+            Key(KeyEvent.KEYCODE_DPAD_RIGHT, C, s(R.string.right)) { board.align(1) },
+            Key(KeyEvent.KEYCODE_DPAD_UP, C, s(R.string.top)) { board.align(2) },
+            Key(KeyEvent.KEYCODE_DPAD_DOWN, C, s(R.string.bottom)) { board.align(3) },
+            Key(KeyEvent.KEYCODE_DPAD_UP, C or A or S, s(R.string.distribute_h)) { board.distribute(true) },
+            Key(KeyEvent.KEYCODE_DPAD_DOWN, C or A or S, s(R.string.distribute_v)) { board.distribute(false) },
+            Key(KeyEvent.KEYCODE_DPAD_LEFT, C or A, s(R.string.n_height)) { board.normalize("height") },
+            Key(KeyEvent.KEYCODE_DPAD_RIGHT, C or A, s(R.string.n_width)) { board.normalize("width") },
+            Key(KeyEvent.KEYCODE_DPAD_UP, C or A, s(R.string.n_size)) { board.normalize("size") },
+            Key(KeyEvent.KEYCODE_DPAD_DOWN, C or A, s(R.string.n_scale)) { board.normalize("scale") },
+        )
+        out += s(R.string.layers) to listOf(
+            Key(KeyEvent.KEYCODE_G, C, s(R.string.group)) { board.group(s(R.string.group)) },
+            Key(KeyEvent.KEYCODE_G, C or S, s(R.string.ungroup)) { board.ungroup() },
+            Key(KeyEvent.KEYCODE_P, 0, s(R.string.parent)) { board.parentToFirst() },
+            Key(KeyEvent.KEYCODE_DPAD_UP, 0, s(R.string.front)) { board.toFront() },
+            Key(KeyEvent.KEYCODE_DPAD_DOWN, 0, s(R.string.back)) { board.toBack() },
+            Key(KeyEvent.KEYCODE_J, C, s(R.string.hierarchy)) { hierarchy() },
+        )
+        out += s(R.string.view) to listOf(
+            Key(KeyEvent.KEYCODE_SPACE, 0, s(R.string.focus)) { board.focus(board.selected()) },
+            Key(KeyEvent.KEYCODE_SPACE, C, s(R.string.focus_canvas)) { board.focusAll() },
+            Key(KeyEvent.KEYCODE_DPAD_RIGHT, 0, s(R.string.next)) { if (board.slides.isNotEmpty()) board.slideStep(1) else board.focusStep(1) },
+            Key(KeyEvent.KEYCODE_DPAD_LEFT, 0, s(R.string.prev)) { if (board.slides.isNotEmpty()) board.slideStep(-1) else board.focusStep(-1) },
+            Key(KeyEvent.KEYCODE_EQUALS, C, s(R.string.zoom_in)) { board.zoomBy(1.25f) },
+            Key(KeyEvent.KEYCODE_PLUS, C, s(R.string.zoom_in)) { board.zoomBy(1.25f) },
+            Key(KeyEvent.KEYCODE_NUMPAD_ADD, C, s(R.string.zoom_in)) { board.zoomBy(1.25f) },
+            Key(KeyEvent.KEYCODE_MINUS, C, s(R.string.zoom_out)) { board.zoomBy(0.8f) },
+            Key(KeyEvent.KEYCODE_NUMPAD_SUBTRACT, C, s(R.string.zoom_out)) { board.zoomBy(0.8f) },
+            Key(KeyEvent.KEYCODE_0, C, s(R.string.reset_zoom)) { board.resetZoom() },
+            Key(KeyEvent.KEYCODE_R, C, s(R.string.lock_canvas)) { toggleCanvasLock() },
+            Key(KeyEvent.KEYCODE_G, C or A, s(R.string.grayscale_canvas)) { Prefs.canvasGray = !Prefs.canvasGray; board.invalidate() },
+            Key(KeyEvent.KEYCODE_G, 0, s(R.string.toggle_grid)) { Prefs.grid = if (Prefs.grid == 0) 2 else 0; board.invalidate() },
+            Key(KeyEvent.KEYCODE_S, A, s(R.string.slideshow)) { board.startSlideshow() },
+            Key(KeyEvent.KEYCODE_A, C or S, s(R.string.always_on_top)) { alwaysOnTop() },
+        )
+        return out
+    }
 
     override fun onKeyDown(code: Int, e: KeyEvent): Boolean {
-        val ctrl = e.isCtrlPressed
-        val shift = e.isShiftPressed
-        when {
-            ctrl && code == KeyEvent.KEYCODE_Z -> if (shift) board.redo() else board.undo()
-            ctrl && code == KeyEvent.KEYCODE_Y -> board.redo()
-            ctrl && code == KeyEvent.KEYCODE_V -> paste()
-            ctrl && code == KeyEvent.KEYCODE_C -> copyItems()
-            ctrl && code == KeyEvent.KEYCODE_X -> if (board.copySelection()) { markClipboard(); board.delete() }
-            ctrl && shift && code == KeyEvent.KEYCODE_P -> palette()
-            ctrl && code == KeyEvent.KEYCODE_A -> board.selectAll()
-            ctrl && code == KeyEvent.KEYCODE_D && shift -> if (board.drawing) board.stopDrawing() else board.startDrawing()
-            ctrl && code == KeyEvent.KEYCODE_D -> board.duplicate()
-            ctrl && code == KeyEvent.KEYCODE_N -> noteEditor(null)
-            ctrl && code == KeyEvent.KEYCODE_I -> pickMedia(REQ_ADD, multiple = true)
-            ctrl && code == KeyEvent.KEYCODE_P -> board.arrange("optimal")
-            ctrl && code == KeyEvent.KEYCODE_S -> if (shift) saveAs() else save()
-            ctrl && (code == KeyEvent.KEYCODE_O || code == KeyEvent.KEYCODE_L) -> openPur()
-            ctrl && code == KeyEvent.KEYCODE_G -> if (shift) board.ungroup() else board.group(s(R.string.group))
-            ctrl && code == KeyEvent.KEYCODE_J -> hierarchy()
-            ctrl && code == KeyEvent.KEYCODE_R -> toggleCanvasLock()
-            e.isAltPressed && code == KeyEvent.KEYCODE_S -> board.startSlideshow()
-            code == KeyEvent.KEYCODE_P -> board.parentToFirst()
-            code == KeyEvent.KEYCODE_DEL || code == KeyEvent.KEYCODE_FORWARD_DEL -> board.delete()
-            code == KeyEvent.KEYCODE_SPACE -> if (ctrl) board.focusAll() else board.focus(board.selected())
-            code == KeyEvent.KEYCODE_DPAD_RIGHT -> if (board.slides.isNotEmpty()) board.slideStep(1) else board.focusStep(1)
-            code == KeyEvent.KEYCODE_DPAD_LEFT -> if (board.slides.isNotEmpty()) board.slideStep(-1) else board.focusStep(-1)
-            code == KeyEvent.KEYCODE_ESCAPE -> back()
-            else -> return super.onKeyDown(code, e)
-        }
+        val mods = (if (e.isCtrlPressed) KeyEvent.META_CTRL_ON else 0) or (if (e.isShiftPressed) KeyEvent.META_SHIFT_ON else 0) or
+            (if (e.isAltPressed) KeyEvent.META_ALT_ON else 0)
+        val k = keys().firstNotNullOfOrNull { (_, ks) -> ks.firstOrNull { it.code == code && it.mods == mods } } ?: return super.onKeyDown(code, e)
+        k.f()
         return true
+    }
+
+    override fun onProvideKeyboardShortcuts(data: MutableList<KeyboardShortcutGroup>, menu: Menu?, deviceId: Int) {
+        for ((title, ks) in keys()) data += KeyboardShortcutGroup(title, ks.distinctBy { it.label }.map { KeyboardShortcutInfo(it.label, it.code, it.mods) })
     }
 
     /** Leaves the current mode first; returns false when there was nothing to leave. */

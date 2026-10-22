@@ -23,6 +23,13 @@ Open and save PureRef .pur files (legacy format), so a board made on your phone 
 * Drawing: pen, line, rectangle, ellipse, eraser, arrows
 * Comments on images
 
+<b>Keyboard and mouse</b>
+* PureRef's default shortcuts and mouse controls, for tablets with a keyboard cover and Chromebooks
+* Touchpad: two-finger swipe pans, pinch zooms
+
+<b>Scenes</b>
+* A grid of previews of every scene, sorted into folders
+
 <b>Always on top</b>
 * Float the board over any app, or over just one app
 * Adjustable opacity, transparent to touch for tracing, background off so only the images float

@@ -16,7 +16,7 @@ paint-bucket check rotate-ccw circle-stop pen-line minus circle eraser ruler spl
 bold italic underline strikethrough a-arrow-up a-arrow-down baseline highlighter type text-align-start text-align-center text-align-end
 list list-ordered list-checks list-indent-increase list-indent-decrease remove-formatting image film image-play message-square
 replace external-link text-cursor-input scissors arrow-down-a-z clock folder-tree shuffle align-horizontal-space-between
-align-vertical-space-between maximize-2 arrow-left-right grid-2x2 sun languages download upload
+align-vertical-space-between maximize-2 arrow-left-right grid-2x2 sun languages download upload folder folder-plus folder-input arrow-left keyboard
 """.split()
 
 

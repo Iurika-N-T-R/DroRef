@@ -35,6 +35,8 @@ object Prefs {
     }
 
     var scene by str("scene", "")
+    var prevScene by str("prevScene", "")         // Ctrl+Shift+L goes back to it
+    var folders by str("folders", "")             // scene browser folders, one per line (also kept when empty)
     var grid by int("grid", 2)                    // 0 none, 1 lines, 2 dots (default, like VizRef / RefCanvas boards)
     var snap by bool("snap", false)
     var canvasGray by bool("gray", false)
@@ -75,7 +77,7 @@ object Prefs {
 
     /** All settings as JSON, for moving them to another device (PureRef 2's settings export). */
     fun exportJson(): String = JSONObject().apply {
-        sp.all.filterKeys { it != "scene" }.forEach { (k, v) ->
+        sp.all.filterKeys { it != "scene" && it != "prevScene" && it != "folders" }.forEach { (k, v) ->
             put(k, JSONArray().put(when (v) { is Int -> "i"; is Boolean -> "b"; is Float -> "f"; is Long -> "l"; else -> "s" }).put(v))
         }
     }.toString(2)

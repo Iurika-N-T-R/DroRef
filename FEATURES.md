@@ -17,7 +17,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 - ✅ Flip horizontal / vertical · ✅ reset transform · ✅ opacity · ✅ toggle grayscale · ✅ bilinear / nearest sampling
 - ✅ Lock / unlock · ✅ send to back / bring to front · ✅ replace image · ✅ open source · ✅ rename
 - ✅ Copy / cut / paste items (Ctrl+C / X / V), also between scenes · ✅ image comments (badge on the image, shown when selected)
-- 🔜 Axis-snapped and neighbor-snapped move · ➖ relink missing images (always embedded)
+- ✅ Axis-snapped move (Shift-drag with a mouse) · 🔜 neighbor-snapped move · ➖ relink missing images (always embedded)
 
 ## Arrange & align
 - ✅ Arrange optimal / by name / addition / order / path / randomly (repeat = reversed); a selected group arranges its contents
@@ -31,7 +31,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 - ✅ Hierarchy (Ctrl+J): tree, tap to focus, long-press to rename / reorder / parent to… / unparent / lock / delete
 
 ## Navigation & canvas
-- ✅ Pan, pinch zoom, mouse wheel · ✅ double-tap focus (again = back) · ✅ focus canvas · ✅ next / previous
+- ✅ Pan, pinch zoom, mouse wheel · ✅ PureRef's mouse controls: left-drag selects, Shift-click adds, Ctrl-drag rotates (Ctrl+Shift: 45° steps), Ctrl+Alt-drag scales, middle / right / Alt-drag pans, right-click menu · ✅ touchpad: two-finger swipe pans, pinch zooms · ✅ double-tap focus (again = back) · ✅ focus canvas · ✅ next / previous
 - ✅ Reset camera / zoom · ✅ lock canvas (Ctrl+R) · ✅ grayscale canvas · ✅ background dots (default) / grid with major lines / plain · ✅ snap to grid
 - ✅ Full-screen canvas with floating icon buttons, a short icon toolbar for the selection, and grouped icon panels instead of long menus · ✅ focus mode (eye button): UI hidden, look only (from VizRef)
 - ✅ Color picker + image coordinates (RGB / HSV / HEX, tap to copy)
@@ -57,7 +57,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 - ✅ Open .pur (Ctrl+O / Ctrl+L) · ✅ Save (Ctrl+S) writes back to the opened .pur · ✅ Save as .pur (Ctrl+Shift+S)
 - ✅ Legacy format, which PureRef 2.1.3 opens (checked with PureRef's own `exportScene`). Drawings are saved as images, videos as a still, groups flattened.
 - ✅ From PureRef 2: *Save as → Legacy PureRef scene*, then open it here · 🔜 PureRef 2 native format (not public)
-- ✅ My scenes: new / open / rename / duplicate / delete, always autosaved, last one reopens
+- ✅ My scenes: grid of previews (Ctrl+Alt+L), folders, new / open / rename / duplicate / delete / move to folder, always autosaved, last one reopens · ✅ previous scene (Ctrl+Shift+L)
 - ✅ Export scene or selection as PNG · ✅ export images as files: originals when uncropped, cropped ones as PNG or JPG
 
 ## Window modes
@@ -71,6 +71,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
   alignment padding, default sampling, slideshow interval / order, drag into groups, auto-parent notes, image quality
 - ✅ Themes: dark / light / glass · ✅ English, Français, Español, 日本語, 한국어, 简体中文, 繁體中文 (PureRef's set)
 - ✅ Command palette (Ctrl+Shift+P): search and run every command, bar action and setting
+- ✅ PureRef's default keyboard shortcuts (align, normalize, arrange, flip, crop, layers, drawing tools…); Ctrl+H or Meta+/ lists them
 - ✅ Export / import all settings as a file
 - ✅ Keyboard shortcuts for tablets / Chromebooks, following PureRef's where they make sense
 - 🔜 Custom theme colors, rebinding shortcuts
