@@ -26,6 +26,10 @@
     <string name="rename_folder">Rename folder…</string>
     <string name="remove_folder">Remove folder (keeps scenes)</string>
     <string name="n_scenes">Scenes: %1$d</string>
+    <string name="guide">Keyboard &amp; mouse</string>
+    <string name="guide_text">MOUSE\n• Left-drag on empty space: select (Shift adds)\n• Click or drag an item: select, move (Shift-click adds, Shift-drag moves in a straight line)\n• Ctrl-drag: rotate (Ctrl+Shift: 45° steps)\n• Ctrl+Alt-drag: scale\n• Middle-, right- or Alt-drag: pan\n• Right-click: menu\n• Wheel: zoom\n\nTOUCHPAD\n• Two-finger swipe: pan\n• Pinch, or Ctrl + swipe: zoom\n\nKEYBOARD\nPureRef\'s default shortcuts, e.g. Ctrl+Z undo, Ctrl+P arrange, Ctrl+arrows align, Space focus, Ctrl+Alt+L my scenes.\nDifferent from PureRef: Ctrl+O opens a .pur file, Ctrl+Y is redo. Window shortcuts (maximize, minimize…) don\'t apply on Android.\n\nCtrl+H opens this guide. Meta+/ (or the button below) lists every shortcut.</string>
+    <string name="all_shortcuts">All shortcuts</string>
+    <string name="keyboard_hint">Keyboard connected: Ctrl+H shows how to use it with DroRef</string>
     <string name="shortcuts">Keyboard shortcuts</string>
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>

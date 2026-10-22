@@ -179,6 +179,7 @@ class MainActivity : Activity(), BoardView.Host {
         edgeToEdge() // needs the window's views, so after setContentView
         remember(scene)
         if (state == null) handle(intent)
+        keyboardHint()
     }
 
     /** Draw behind the status and navigation bars; the floating UI gets the insets as padding. */
@@ -340,7 +341,7 @@ class MainActivity : Activity(), BoardView.Host {
     private fun mainSheet() = sheet(board.scene.name, mainSections(), light, listOf(
         Triple(R.drawable.ic_command, s(R.string.command_palette)) { palette() },
         Triple(R.drawable.ic_settings, s(R.string.settings)) { showSettings() },
-        Triple(R.drawable.ic_keyboard, s(R.string.shortcuts)) { requestShowKeyboardShortcuts() },
+        Triple(R.drawable.ic_keyboard, s(R.string.guide)) { keyboardGuide() },
         Triple(R.drawable.ic_info, s(R.string.about)) { about() },
     ))
 
@@ -1303,7 +1304,7 @@ class MainActivity : Activity(), BoardView.Host {
             Key(KeyEvent.KEYCODE_V, C, s(R.string.paste)) { paste() },
             Key(KeyEvent.KEYCODE_P, C or S, s(R.string.command_palette)) { palette() },
             Key(KeyEvent.KEYCODE_U, C, s(R.string.settings)) { showSettings() },
-            Key(KeyEvent.KEYCODE_H, C, s(R.string.shortcuts)) { requestShowKeyboardShortcuts() },
+            Key(KeyEvent.KEYCODE_H, C, s(R.string.guide)) { keyboardGuide() },
             Key(KeyEvent.KEYCODE_1, A, s(R.string.theme_dark)) { Prefs.theme = 0; recreate() },
             Key(KeyEvent.KEYCODE_2, A, s(R.string.theme_light)) { Prefs.theme = 1; recreate() },
             Key(KeyEvent.KEYCODE_3, A, s(R.string.theme_glass)) { Prefs.theme = 2; recreate() },
@@ -1381,6 +1382,25 @@ class MainActivity : Activity(), BoardView.Host {
             Key(KeyEvent.KEYCODE_A, C or S, s(R.string.always_on_top)) { alwaysOnTop() },
         )
         return out
+    }
+
+    /** How the mouse, touchpad and keys work; Android's own list only shows keys. */
+    private fun keyboardGuide() {
+        AlertDialog.Builder(this).setTitle(R.string.guide).setMessage(R.string.guide_text)
+            .setPositiveButton(R.string.all_shortcuts) { _, _ -> requestShowKeyboardShortcuts() }
+            .setNegativeButton(R.string.close, null).show()
+    }
+
+    /** Once, the first time a keyboard is plugged in or the cover is attached. */
+    private fun keyboardHint() {
+        if (resources.configuration.keyboard != android.content.res.Configuration.KEYBOARD_QWERTY || Prefs.keyboardHinted) return
+        Prefs.keyboardHinted = true
+        Toast.makeText(this, s(R.string.keyboard_hint), Toast.LENGTH_LONG).show()
+    }
+
+    override fun onConfigurationChanged(c: android.content.res.Configuration) {
+        super.onConfigurationChanged(c)
+        keyboardHint()
     }
 
     override fun onKeyDown(code: Int, e: KeyEvent): Boolean {

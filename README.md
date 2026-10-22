@@ -34,7 +34,7 @@ From PureRef 2, save with *Save as → Legacy PureRef scene* first.
 Everything PureRef has, and what's done here: [FEATURES.md](FEATURES.md)
 
 ## Keyboard and mouse
-With a tablet keyboard cover, a Bluetooth keyboard and mouse, or a Chromebook, DroRef works like PureRef on a PC: same default shortcuts, same mouse controls. **Ctrl+H** (or Meta+/) lists every shortcut.
+With a tablet keyboard cover, a Bluetooth keyboard and mouse, or a Chromebook, DroRef works like PureRef on a PC: same default shortcuts, same mouse controls. **Ctrl+H** (or the keyboard button in the menu) opens a short guide in the app; **Meta+/** lists every shortcut. The first time a keyboard is connected, DroRef points to the guide.
 
 | Mouse | |
 |:--|:--|

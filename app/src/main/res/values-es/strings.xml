@@ -25,6 +25,10 @@
     <string name="rename_folder">Renombrar carpeta…</string>
     <string name="remove_folder">Quitar carpeta (conserva las escenas)</string>
     <string name="n_scenes">Escenas: %1$d</string>
+    <string name="guide">Teclado y ratón</string>
+    <string name="guide_text">RATÓN\n• Arrastrar en un espacio vacío: seleccionar (Mayús añade)\n• Clic o arrastrar un elemento: seleccionar, mover (Mayús+clic añade, Mayús+arrastrar mueve en línea recta)\n• Ctrl+arrastrar: girar (Ctrl+Mayús: de 45° en 45°)\n• Ctrl+Alt+arrastrar: escalar\n• Arrastrar con el botón central, el derecho o Alt: desplazar la vista\n• Clic derecho: menú\n• Rueda: zoom\n\nPANEL TÁCTIL\n• Deslizar con dos dedos: desplazar la vista\n• Pellizcar, o Ctrl + deslizar: zoom\n\nTECLADO\nLos atajos por defecto de PureRef, p. ej. Ctrl+Z deshacer, Ctrl+P organizar, Ctrl+flechas alinear, Espacio encuadrar, Ctrl+Alt+L mis escenas.\nDistinto de PureRef: Ctrl+O abre un archivo .pur, Ctrl+Y rehace. Los atajos de ventana (maximizar, minimizar…) no se aplican en Android.\n\nCtrl+H abre esta guía. Meta+/ (o el botón de abajo) muestra todos los atajos.</string>
+    <string name="all_shortcuts">Todos los atajos</string>
+    <string name="keyboard_hint">Teclado conectado: Ctrl+H muestra cómo usarlo con DroRef</string>
     <string name="shortcuts">Atajos de teclado</string>
     <string name="zoom_in">Acercar</string>
     <string name="zoom_out">Alejar</string>

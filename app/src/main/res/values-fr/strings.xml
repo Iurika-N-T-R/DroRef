@@ -25,6 +25,10 @@
     <string name="rename_folder">Renommer le dossier…</string>
     <string name="remove_folder">Supprimer le dossier (garde les scènes)</string>
     <string name="n_scenes">Scènes : %1$d</string>
+    <string name="guide">Clavier et souris</string>
+    <string name="guide_text">SOURIS\n• Glisser dans le vide : sélectionner (Maj ajoute)\n• Clic ou glisser sur un élément : sélectionner, déplacer (Maj+clic ajoute, Maj+glisser déplace en ligne droite)\n• Ctrl+glisser : pivoter (Ctrl+Maj : par 45°)\n• Ctrl+Alt+glisser : redimensionner\n• Glisser avec le bouton du milieu, le droit ou Alt : déplacer la vue\n• Clic droit : menu\n• Molette : zoom\n\nPAVÉ TACTILE\n• Balayer à deux doigts : déplacer la vue\n• Pincer, ou Ctrl + balayer : zoom\n\nCLAVIER\nLes raccourcis par défaut de PureRef, ex. Ctrl+Z annuler, Ctrl+P ranger, Ctrl+flèches aligner, Espace cadrer, Ctrl+Alt+L mes scènes.\nDifférent de PureRef : Ctrl+O ouvre un fichier .pur, Ctrl+Y rétablit. Les raccourcis de fenêtre (agrandir, réduire…) ne s\'appliquent pas sur Android.\n\nCtrl+H ouvre ce guide. Méta+/ (ou le bouton ci-dessous) liste tous les raccourcis.</string>
+    <string name="all_shortcuts">Tous les raccourcis</string>
+    <string name="keyboard_hint">Clavier connecté : Ctrl+H montre comment l\'utiliser avec DroRef</string>
     <string name="shortcuts">Raccourcis clavier</string>
     <string name="zoom_in">Zoom avant</string>
     <string name="zoom_out">Zoom arrière</string>

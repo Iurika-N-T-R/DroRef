@@ -25,6 +25,10 @@
     <string name="rename_folder">폴더 이름 바꾸기…</string>
     <string name="remove_folder">폴더 삭제 (장면 유지)</string>
     <string name="n_scenes">장면: %1$d</string>
+    <string name="guide">키보드와 마우스</string>
+    <string name="guide_text">마우스\n• 빈 곳에서 왼쪽 드래그: 선택 (Shift로 추가)\n• 항목 클릭 또는 드래그: 선택, 이동 (Shift+클릭으로 추가, Shift+드래그로 직선 이동)\n• Ctrl+드래그: 회전 (Ctrl+Shift: 45° 단위)\n• Ctrl+Alt+드래그: 크기 조절\n• 가운데·오른쪽 버튼 또는 Alt로 드래그: 화면 이동\n• 오른쪽 클릭: 메뉴\n• 휠: 확대/축소\n\n터치패드\n• 두 손가락 스와이프: 화면 이동\n• 핀치 또는 Ctrl+스와이프: 확대/축소\n\n키보드\nPureRef 기본 단축키. 예: Ctrl+Z 실행 취소, Ctrl+P 정렬, Ctrl+화살표 맞춤, Space 초점, Ctrl+Alt+L 내 장면.\nPureRef와 다른 점: Ctrl+O는 .pur 파일 열기, Ctrl+Y는 다시 실행. 창 단축키(최대화, 최소화 등)는 Android에서 쓸 수 없습니다.\n\nCtrl+H로 이 안내를 엽니다. Meta+/ (또는 아래 버튼)로 모든 단축키를 봅니다.</string>
+    <string name="all_shortcuts">모든 단축키</string>
+    <string name="keyboard_hint">키보드 연결됨: Ctrl+H로 DroRef 사용법 보기</string>
     <string name="shortcuts">키보드 단축키</string>
     <string name="zoom_in">확대</string>
     <string name="zoom_out">축소</string>

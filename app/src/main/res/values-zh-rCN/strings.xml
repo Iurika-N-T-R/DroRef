@@ -25,6 +25,10 @@
     <string name="rename_folder">重命名文件夹…</string>
     <string name="remove_folder">移除文件夹（保留场景）</string>
     <string name="n_scenes">场景：%1$d</string>
+    <string name="guide">键盘和鼠标</string>
+    <string name="guide_text">鼠标\n• 在空白处左键拖动：框选（Shift 追加）\n• 点击或拖动项目：选择、移动（Shift+点击追加，Shift+拖动沿直线移动）\n• Ctrl+拖动：旋转（Ctrl+Shift：以 45° 为步进）\n• Ctrl+Alt+拖动：缩放\n• 中键、右键或 Alt 拖动：平移\n• 右键点击：菜单\n• 滚轮：缩放视图\n\n触控板\n• 双指滑动：平移\n• 双指捏合，或 Ctrl+滑动：缩放视图\n\n键盘\nPureRef 的默认快捷键，例如 Ctrl+Z 撤销、Ctrl+P 排列、Ctrl+方向键 对齐、Space 聚焦、Ctrl+Alt+L 我的场景。\n与 PureRef 不同：Ctrl+O 打开 .pur 文件，Ctrl+Y 重做。窗口快捷键（最大化、最小化等）在 Android 上不适用。\n\nCtrl+H 打开本指南。Meta+/（或下方按钮）列出全部快捷键。</string>
+    <string name="all_shortcuts">全部快捷键</string>
+    <string name="keyboard_hint">已连接键盘：按 Ctrl+H 查看在 DroRef 中的用法</string>
     <string name="shortcuts">键盘快捷键</string>
     <string name="zoom_in">放大</string>
     <string name="zoom_out">缩小</string>

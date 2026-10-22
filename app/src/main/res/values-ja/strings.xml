@@ -25,6 +25,10 @@
     <string name="rename_folder">フォルダー名を変更…</string>
     <string name="remove_folder">フォルダーを削除（シーンは残す）</string>
     <string name="n_scenes">シーン：%1$d</string>
+    <string name="guide">キーボードとマウス</string>
+    <string name="guide_text">マウス\n• 何もない所を左ドラッグ：選択（Shift で追加）\n• アイテムをクリック／ドラッグ：選択、移動（Shift+クリックで追加、Shift+ドラッグで直線移動）\n• Ctrl+ドラッグ：回転（Ctrl+Shift：45°刻み）\n• Ctrl+Alt+ドラッグ：拡大縮小\n• 中ボタン・右ボタン・Alt でドラッグ：パン\n• 右クリック：メニュー\n• ホイール：ズーム\n\nタッチパッド\n• 2本指スワイプ：パン\n• ピンチ、または Ctrl+スワイプ：ズーム\n\nキーボード\nPureRef の標準ショートカット。例：Ctrl+Z 元に戻す、Ctrl+P 整列、Ctrl+矢印 揃え、Space フォーカス、Ctrl+Alt+L マイシーン。\nPureRef との違い：Ctrl+O は .pur を開く、Ctrl+Y はやり直し。ウィンドウ操作（最大化、最小化など）は Android では使えません。\n\nCtrl+H でこのガイド。Meta+/（または下のボタン）で全ショートカット一覧。</string>
+    <string name="all_shortcuts">全ショートカット</string>
+    <string name="keyboard_hint">キーボード接続：Ctrl+H で DroRef での使い方を表示</string>
     <string name="shortcuts">キーボードショートカット</string>
     <string name="zoom_in">拡大</string>
     <string name="zoom_out">縮小</string>

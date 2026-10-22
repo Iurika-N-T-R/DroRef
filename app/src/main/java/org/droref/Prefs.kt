@@ -36,6 +36,7 @@ object Prefs {
 
     var scene by str("scene", "")
     var prevScene by str("prevScene", "")         // Ctrl+Shift+L goes back to it
+    var keyboardHinted by bool("keyboardHinted", false) // "Ctrl+H shows how" toast, once
     var folders by str("folders", "")             // scene browser folders, one per line (also kept when empty)
     var grid by int("grid", 2)                    // 0 none, 1 lines, 2 dots (default, like VizRef / RefCanvas boards)
     var snap by bool("snap", false)

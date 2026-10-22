@@ -1,0 +1,1 @@
+Keyboard & mouse guide: Ctrl+H or the keyboard button in the menu explains the mouse, touchpad and shortcuts. The first time a keyboard is connected, DroRef points to it.
