@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DroRef</title>
+<meta name="description" content="DroRef: a free, open-source reference board for Android. Opens and saves PureRef .pur files.">
+<link rel="icon" href="img/icon.png">
+<meta property="og:title" content="DroRef">
+<meta property="og:description" content="Free, open-source reference board for Android. Opens and saves PureRef .pur files.">
+<meta property="og:image" content="img/icon.png">
+<style>
+  :root {
+    --bg: #111113; --surface: #1b1b1f; --line: #2c2c33;
+    --text: #f2efe9; --muted: #9a9aa6; --accent: #ff5a1f; --accent-2: #ff9a1f;
+    --dot: #2a2a30;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f6f4f0; --surface: #ffffff; --line: #e4e0d8;
+      --text: #1a1a1d; --muted: #5f5f6b; --accent: #e04a12; --accent-2: #e07a00;
+      --dot: #dcd8d0;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background-image: radial-gradient(var(--dot) 1.4px, transparent 1.4px);
+    background-size: 26px 26px;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+
+  header { display: flex; align-items: center; gap: 12px; padding: 20px 0; }
+  header img { width: 36px; height: 36px; border-radius: 9px; }
+  header b { font-size: 19px; }
+  header nav { margin-left: auto; display: flex; gap: 18px; }
+  header nav a { color: var(--muted); text-decoration: none; font-size: 15px; }
+  header nav a:hover { color: var(--text); }
+
+  .hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center; padding: 48px 0 72px; }
+  .hero h1 { font-size: clamp(36px, 6vw, 60px); line-height: 1.05; margin: 0 0 18px; letter-spacing: -.02em; }
+  .hero h1 span {
+    background: linear-gradient(90deg, var(--accent-2), var(--accent));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p { color: var(--muted); font-size: 19px; margin: 0 0 28px; max-width: 34em; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 999px;
+    text-decoration: none; font-weight: 600; font-size: 16px; border: 1px solid var(--line);
+    color: var(--text); background: var(--surface);
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.coffee { background: #ffdd00; border-color: #ffdd00; color: #1a1a1d; }
+  .btn:hover { filter: brightness(1.08); }
+  .note { font-size: 14px; color: var(--muted); margin-top: 18px; }
+
+  .phones { position: relative; height: 560px; }
+  .phones img {
+    position: absolute; width: 230px; border-radius: 26px; border: 6px solid #0a0a0b;
+    box-shadow: 0 30px 60px rgba(0,0,0,.45);
+  }
+  .phones img:nth-child(1) { left: 0; top: 40px; transform: rotate(-7deg); }
+  .phones img:nth-child(2) { left: 170px; top: 0; transform: rotate(5deg); z-index: 1; }
+
+  section { padding: 56px 0; }
+  h2 { font-size: 32px; margin: 0 0 8px; letter-spacing: -.01em; }
+  .lead { color: var(--muted); margin: 0 0 32px; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
+  .card h3 { margin: 0 0 8px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+  .card h3 i { font-style: normal; font-size: 20px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  .shots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .shots figure { margin: 0; }
+  .shots img { width: 100%; border-radius: 18px; border: 1px solid var(--line); display: block; }
+  .shots figcaption { color: var(--muted); font-size: 14px; text-align: center; margin-top: 8px; }
+
+  .pur { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: center; }
+  .flow { display: flex; align-items: center; justify-content: center; gap: 14px; font-weight: 600; flex-wrap: wrap; }
+  .flow span { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; }
+  .flow em { font-style: normal; color: var(--accent); font-size: 22px; }
+
+  .support { text-align: center; background: var(--surface); border: 1px solid var(--line); border-radius: 24px; padding: 48px 24px; }
+  .support p { color: var(--muted); max-width: 36em; margin: 0 auto 24px; }
+
+  footer { padding: 40px 0 56px; color: var(--muted); font-size: 14px; text-align: center; }
+  footer a { color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; padding-top: 24px; }
+    .phones { height: 440px; max-width: 380px; margin: 0 auto; width: 100%; }
+    .phones img { width: 180px; }
+    .phones img:nth-child(2) { left: auto; right: 0; }
+    .grid { grid-template-columns: 1fr 1fr; }
+    .shots { grid-template-columns: 1fr 1fr; }
+    .pur { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    header nav { display: none; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="img/icon.png" alt="">
+    <b>DroRef</b>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#screens">Screens</a>
+      <a href="#pur">PureRef files</a>
+      <a href="https://github.com/Iurika-N-T-R/DroRef">GitHub</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div>
+      <h1>Your reference board,<br><span>in your pocket.</span></h1>
+      <p>DroRef is a free, open-source reference board for Android. Collect images on an infinite canvas, arrange them, and float them over your drawing app. It opens and saves PureRef <code>.pur</code> files.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/Iurika-N-T-R/DroRef/releases/latest">⬇ Download APK</a>
+        <a class="btn" href="https://github.com/Iurika-N-T-R/DroRef">★ Source on GitHub</a>
+        <a class="btn coffee" href="https://buymeacoffee.com/iurika">☕ Buy me a coffee</a>
+      </div>
+      <p class="note">No ads, no account, no tracking. MIT licensed.</p>
+    </div>
+    <div class="phones">
+      <img src="img/1_board.png" alt="A board with images on a dotted canvas">
+      <img src="img/3_floating.png" alt="The board floating over another app">
+    </div>
+  </div>
+
+  <section id="features">
+    <h2>Everything a reference board needs</h2>
+    <p class="lead">Built for artists who draw on a tablet or phone.</p>
+    <div class="grid">
+      <div class="card"><h3><i>📥</i>Collect</h3><p>Add images and videos from the gallery, paste them, share to DroRef, paste a link, or drag and drop from another app in split screen.</p></div>
+      <div class="card"><h3><i>✋</i>Arrange</h3><p>Move, scale and rotate with your fingers. Crop, flip, align, distribute, stack, normalize sizes, group and parent.</p></div>
+      <div class="card"><h3><i>📌</i>Always on top</h3><p>Float the board over any app, or only over one. Set opacity, make it transparent to touch for tracing, or hide the background.</p></div>
+      <div class="card"><h3><i>🎞️</i>GIFs &amp; video loops</h3><p>Play, pause, step frames, scrub and change speed. Loop a video between two points and grab any frame as an image.</p></div>
+      <div class="card"><h3><i>🎨</i>Study</h3><p>Color picker with RGB, HSV and HEX, grayscale canvas, slideshow, and a focus mode that hides all the UI.</p></div>
+      <div class="card"><h3><i>✏️</i>Annotate</h3><p>Rich-text notes with checklists and links, drawing tools with arrows, and comments on images.</p></div>
+    </div>
+  </section>
+
+  <section id="screens">
+    <h2>Screens</h2>
+    <p class="lead">Dark, light and glass themes. Dot, grid or plain backgrounds.</p>
+    <div class="shots">
+      <figure><img src="img/1_board.png" alt="" loading="lazy"><figcaption>The board</figcaption></figure>
+      <figure><img src="img/2_light_grid.png" alt="" loading="lazy"><figcaption>Light theme, grid</figcaption></figure>
+      <figure><img src="img/3_floating.png" alt="" loading="lazy"><figcaption>Floating over an app</figcaption></figure>
+      <figure><img src="img/4_slideshow.png" alt="" loading="lazy"><figcaption>Slideshow</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="pur">
+    <div class="pur">
+      <div>
+        <h2>Boards that go between phone and PC</h2>
+        <p class="lead" style="margin-bottom:12px">Open a <code>.pur</code> from PureRef, edit it on your phone, save it back. PureRef opens it on your computer. From PureRef 2, use <em>Save as → Legacy PureRef scene</em> first.</p>
+        <p class="note">DroRef is an independent app, not affiliated with PureRef or Idyllic Pixel. On PC, use the original: <a href="https://www.pureref.com">pureref.com</a></p>
+      </div>
+      <div class="flow"><span>📱 DroRef</span><em>⇄</em><span>.pur</span><em>⇄</em><span>🖥️ PureRef</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="support">
+      <h2>Support DroRef</h2>
+      <p>One person builds and maintains DroRef, and it will stay free. If it helps your work, a coffee helps keep it going.</p>
+      <a class="btn coffee" href="https://buymeacoffee.com/iurika">☕ Buy me a coffee</a>
+    </div>
+  </section>
+
+  <footer>
+    Made by <a href="https://github.com/Iurika-N-T-R">Iurika</a> · <a href="https://github.com/Iurika-N-T-R/DroRef/blob/main/LICENSE">MIT License</a> · English, Français, Español, 日本語, 한국어, 中文
+  </footer>
+</div>
+</body>
+</html>

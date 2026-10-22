@@ -2,6 +2,18 @@
 
 Free, open-source reference board for Android.
 
+[![license](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![release](https://img.shields.io/github/v/release/Iurika-N-T-R/DroRef?style=flat-square)](../../releases/latest)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/iurika)
+
+**Website:** https://iurika-n-t-r.github.io/DroRef/
+
+<p>
+  <img src="docs/img/1_board.png" width="200" alt="Board">
+  <img src="docs/img/2_light_grid.png" width="200" alt="Light theme">
+  <img src="docs/img/3_floating.png" width="200" alt="Floating over another app">
+</p>
+
 Inspired by [PureRef](https://www.pureref.com). DroRef is an independent app written from scratch and is not affiliated with PureRef or Idyllic Pixel. **On PC, use the original: https://www.pureref.com**
 
 Boards move between the two as `.pur` files: *File → Open .pur*, *Save*, *Save as .pur*.
@@ -47,6 +59,9 @@ Download the APK from [Releases](../../releases), or build it:
 Signing reads `keystore.properties` (git-ignored): `storeFile`, `storePassword`, `keyAlias`, `keyPassword`.
 Without it, release builds are unsigned, which is what F-Droid expects (it signs with its own key).
 Store listing text and screenshots for F-Droid live in `fastlane/metadata/android/`.
+
+## Support
+DroRef is built and maintained solo and stays free. If it helps you, consider [buying me a coffee](https://buymeacoffee.com/iurika) ☕
 
 ## Credits
 - `.pur` format: ported from [FyorDev/PureRef-format](https://github.com/FyorDev/PureRef-format) (MIT)
