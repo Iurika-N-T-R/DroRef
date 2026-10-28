@@ -1,0 +1,1 @@
+Nodes and connections: curved arrows between items, new linked node by dragging to empty space. Selection handles with live size, a toolbar that floats above the selection with quick rotate / size / info menus, a tool rail (select, hand, connect, draw, lock images or nodes), center cross, content frame, color labels and web links on items.

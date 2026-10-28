@@ -42,6 +42,9 @@ object Prefs {
     var snap by bool("snap", false)
     var canvasGray by bool("gray", false)
     var canvasLocked by bool("locked", false)
+    var centerCross by bool("centerCross", false) // a cross at the board's origin
+    var container by bool("container", false)     // a frame around everything on the board
+    var hexHash by bool("hexHash", true)          // color picker copies "#RRGGBB" (off: "RRGGBB")
     var normalizeFirst by bool("normalizeFirst", false)
 
     // settings screen (defaults follow PureRef's)

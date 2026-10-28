@@ -20,14 +20,16 @@ Boards move between the two as `.pur` files: *File → Open .pur*, *Save*, *Save
 From PureRef 2, save with *Save as → Legacy PureRef scene* first.
 
 ## Using it
-- The canvas fills the screen (dot background by default; grid or plain in the menu, under View). Round buttons: menu and scene name top-left, undo, redo and focus mode top-right, add bottom-right.
+- The canvas fills the screen (dot background by default; grid or plain in the menu, under View; a center cross and a frame around the content too). Round buttons: menu and scene name top-left, undo, redo and focus mode top-right, add bottom-right (a short list: images, paste, note, node, draw).
+- A rail of tools bottom-left: **select**, **hand** (drags and pinches only move the view, nothing moves by accident), **connect**, **draw**, and **lock**: images / videos / drawings, or notes / nodes / connections, can be locked so only the other layer is editable.
 - The menu is a panel of icon tiles grouped by purpose (Add, Board, File, View); search, settings and about sit in its header.
 - **Add** images and videos from the gallery, paste them, paste a link, use *Share → DroRef*, or **drag and drop** them from another app (gallery, browser, files) in split screen: they land where you drop them.
 - To drag an image **out** to another app, select it, then long-press it again and drag.
 - Drag empty space to pan, pinch to zoom, double-tap to focus.
 - Tap to select. Drag to move; pinch or twist with two fingers to scale and rotate.
 - Long-press an item to add it to the selection. Long-press empty space and drag to select a rectangle; release without dragging for the canvas panel.
-- What's selected gets a short toolbar of icons (long-press one to see its name); "more" opens everything else, grouped: Transform, Arrange, Align, Size, Layers & groups, Item.
+- What's selected gets corner handles (drag to scale from the opposite corner), a rotate handle on the right (sticks at 45°), its size on the board underneath, and a short toolbar floating just above it (long-press an icon to see its name): info, rotate (90° / 180° / 270° / reset), size (100 % / ×2 / ×½), more and delete. "More" lists the everyday actions (front, back, flip, gray, duplicate, color label, web link); "All options…" opens everything else, grouped: Transform, Arrange, Align, Size, Layers & groups, Item.
+- **Nodes and connections**: with *connect*, drag from one item to another to link them with a curved arrow that follows both; let go on empty space to create a new node there. Tap a connection to reverse it, put arrows at both ends, recolor or delete it. *Save as .pur* turns connections into drawings, since PureRef has none.
 - **My scenes** (tap the scene name, or *Ctrl+Alt+L*) shows every scene as a preview; long-press one to rename it or move it into a folder. *Ctrl+Shift+L* jumps back to the previous scene.
 - *Always on top* floats the board over your drawing app. Its bar has opacity, transparent-to-touch (for tracing), background off (only the images float), and a pin to show it only over one app (Android asks once for usage access).
 

@@ -14,6 +14,7 @@ object Boards {
 
     // DroRef's own clipboard for board items (copy/cut/paste, also between scenes)
     var clip: List<Item> = emptyList()
+    var clipLinks: List<Link> = emptyList()
     var clipImages: java.io.File? = null
 }
 
@@ -23,18 +24,22 @@ class Scene private constructor(val dir: File) {
     var purUri = "" // the .pur file "Save" writes to
     var folder = "" // "" = not in a folder (scene browser)
     val items = mutableListOf<Item>()
+    val links = mutableListOf<Link>() // arrows between items (nodes)
+    var lockVisuals = false // "Verrouillage": images, videos and drawings can't be selected or moved
+    var lockNodes = false   // notes, nodes and links can't be selected or moved
     val cam = Matrix() // board -> screen
     val images = File(dir, "images").apply { mkdirs() }
     private var nextId = 1L
     private val json = AtomicFile(File(dir, "scene.json"))
-    private val undos = ArrayDeque<List<Item>>()
-    private val redos = ArrayDeque<List<Item>>()
+    private class Snap(val items: List<Item>, val links: List<Link>)
+    private val undos = ArrayDeque<Snap>()
+    private val redos = ArrayDeque<Snap>()
 
     fun newId() = nextId++
 
     /** Call before a change to make it undoable. */
     fun checkpoint() {
-        undos.addLast(items.toList())
+        undos.addLast(Snap(items.toList(), links.toList()))
         while (undos.size > Prefs.undoLimit) undos.removeFirst()
         redos.clear()
     }
@@ -42,11 +47,13 @@ class Scene private constructor(val dir: File) {
     fun undo() = swap(undos, redos)
     fun redo() = swap(redos, undos)
 
-    private fun swap(from: ArrayDeque<List<Item>>, to: ArrayDeque<List<Item>>): Boolean {
+    private fun swap(from: ArrayDeque<Snap>, to: ArrayDeque<Snap>): Boolean {
         val s = from.removeLastOrNull() ?: return false
-        to.addLast(items.toList())
+        to.addLast(Snap(items.toList(), links.toList()))
         items.clear()
-        items += s
+        items += s.items
+        links.clear()
+        links += s.links
         return true
     }
 
@@ -55,6 +62,8 @@ class Scene private constructor(val dir: File) {
         val o = JSONObject().put("name", name).put("nextId", nextId).put("purUri", purUri).put("folder", folder)
             .put("camera", JSONArray(v.map { it.toDouble() }))
             .put("items", JSONArray(items.map { it.toJson() }))
+            .put("links", JSONArray(links.map { it.toJson() }))
+            .put("lockVisuals", lockVisuals).put("lockNodes", lockNodes)
         val out = json.startWrite()
         try {
             out.write(o.toString().toByteArray())
@@ -75,9 +84,9 @@ class Scene private constructor(val dir: File) {
     val edited get() = File(dir, "scene.json").lastModified()
 
     /** Small preview for the scene browser; [items] copied on the UI thread, this runs on a background one. */
-    fun writeThumb(items: List<Item>) {
+    fun writeThumb(items: List<Item>, links: List<Link> = emptyList()) {
         if (items.isEmpty()) { thumb.delete(); return }
-        val b = renderItems(items, images, 640, false)
+        val b = renderItems(items, images, 640, false, links)
         runCatching { thumb.outputStream().use { b.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it) } }
         b.recycle()
     }
@@ -97,6 +106,9 @@ class Scene private constructor(val dir: File) {
         o.optJSONArray("camera")?.let { c -> cam.setValues(FloatArray(9) { c.getDouble(it).toFloat() }) }
         val a = o.getJSONArray("items")
         for (i in 0 until a.length()) runCatching { items += Item.fromJson(a.getJSONObject(i)) }
+        o.optJSONArray("links")?.let { l -> for (i in 0 until l.length()) runCatching { links += Link.fromJson(l.getJSONObject(i)) } }
+        lockVisuals = o.optBoolean("lockVisuals")
+        lockNodes = o.optBoolean("lockNodes")
         if (clean) {
             // images deleted in an earlier session (undo history is gone, so nothing can bring them back)
             val used = items.map { it.file }.toSet()

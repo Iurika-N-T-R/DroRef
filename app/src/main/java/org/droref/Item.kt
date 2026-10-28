@@ -30,6 +30,7 @@ const val VIDEO = 5
 const val NOTE_TEXT = 24f
 const val NOTE_PAD = 12f
 const val GROUP_PAD = 20f
+const val NODE_BG = 0xFF3A3A3A.toInt()
 
 const val T_PEN = 0
 const val T_LINE = 1
@@ -97,6 +98,9 @@ data class Item(
     val loopB: Float = 1f,
     val noteWidth: Float = 0f,             // note wrap width; 0 = auto size (one line per paragraph)
     val comment: String = "",              // image comment (PureRef 2)
+    val tag: Int = 0,                      // color label drawn around it; 0 = none
+    val url: String = "",                  // link opened from its badge
+    val node: Boolean = false,             // note shown as a node (rounded box, for links)
 ) {
     /** Content coords -> board coords. */
     fun matrix() = Matrix().apply {
@@ -112,6 +116,8 @@ data class Item(
     fun moveBy(dx: Float, dy: Float) = copy(x = x + dx, y = y + dy)
 
     val isMedia get() = type == IMAGE || type == GIF || type == VIDEO
+    /** "Verrouillage" splits the board in two: visuals (images, videos, drawings) and nodes (notes, nodes, links). */
+    val isVisual get() = isMedia || type == DRAW
 
     /** [n] moved so its visible center stays where ours is. */
     fun keepCenter(n: Item): Item {
@@ -169,6 +175,7 @@ data class Item(
         put("strokes", JSONArray(strokes.map { it.toJson() }))
         put("loopA", loopA.toDouble()); put("loopB", loopB.toDouble())
         put("noteWidth", noteWidth.toDouble()); put("comment", comment)
+        put("tag", tag); put("url", url); put("node", node)
     }
 
     companion object {
@@ -186,6 +193,7 @@ data class Item(
                 o.optLong("parent"), o.optBoolean("closed", true), o.optString("spans"),
                 if (st == null) emptyList() else List(st.length()) { Stroke.fromJson(st.getJSONObject(it)) },
                 f("loopA", 0f), f("loopB", 1f), f("noteWidth", 0f), o.optString("comment"),
+                o.optInt("tag"), o.optString("url"), o.optBoolean("node"),
             )
         }
     }

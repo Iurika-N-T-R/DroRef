@@ -55,6 +55,9 @@ const val GRID = 50f
 val DRAG_SELF = Any()
 private const val MIN_ZOOM = 0.005f
 private const val MAX_ZOOM = 64f
+const val TOOL_SELECT = 0
+const val TOOL_HAND = 1
+const val TOOL_CONNECT = 2
 
 /** Draws items. Paint isn't thread-safe, so one Painter per thread. */
 class Painter {
@@ -79,7 +82,11 @@ class Painter {
         val f = if (gray) grayFilter else null
         when (it.type) {
             NOTE -> {
-                rect(c, it, it.bgColor, alpha, f)
+                if (it.node) { // a node: rounded box
+                    fill.color = it.bgColor; fill.alpha = Color.alpha(it.bgColor) * alpha / 255; fill.colorFilter = f
+                    val r = min(it.h / 2, 22f)
+                    c.drawRoundRect(0f, 0f, it.w, it.h, r, r, fill)
+                } else rect(c, it, it.bgColor, alpha, f)
                 val l = layout(it)
                 text.color = it.textColor
                 text.alpha = Color.alpha(it.textColor) * alpha / 255
@@ -157,7 +164,7 @@ fun drawOrder(items: List<Item>): List<Item> {
 }
 
 /** Renders items into one bitmap, longest side at most [maxSide]. Call off the UI thread. */
-fun renderItems(items: List<Item>, images: File, maxSide: Int, gray: Boolean): Bitmap {
+fun renderItems(items: List<Item>, images: File, maxSide: Int, gray: Boolean, links: List<Link> = emptyList()): Bitmap {
     val r = items.union()
     val s = min(maxSide / max(r.width(), r.height()).coerceAtLeast(1f), 4f)
     val out = Bitmap.createBitmap(max(1, (r.width() * s).roundToInt()), max(1, (r.height() * s).roundToInt()), Bitmap.Config.ARGB_8888)
@@ -176,6 +183,7 @@ fun renderItems(items: List<Item>, images: File, maxSide: Int, gray: Boolean): B
         p.item(c, it, b, gray)
         b?.recycle()
     }
+    drawLinks(c, LinkPainter(), links, items, 3f / s)
     return out
 }
 
@@ -197,6 +205,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         fun picked(info: String, hex: String)
         fun editItem(item: Item)
         fun itemMenu() {} // right-click on an item
+        fun boardDrawn() {} // after every frame: the selection may have moved on screen
     }
 
     class Src(val name: String, val source: String, val open: () -> InputStream?)
@@ -213,6 +222,11 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         private set
     var background = 0 // floating window: 0 solid, 1 glass, 2 none
         set(v) { field = v; invalidate() }
+    /** Touch tool: select and move (default), hand (only pans and zooms: nothing moves by accident), connect (drag from item to item). */
+    var tool = TOOL_SELECT
+        set(v) { field = v; if (v != TOOL_SELECT) clearSelection(); invalidate() }
+    var linkSel = -1L // a selected link (an item selection and a link selection don't mix)
+        private set
 
     private val ownCam = Matrix() // the floating window has its own view of the board
     private val cam get() = if (floating) ownCam else scene.cam
@@ -231,7 +245,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x30808080; strokeCap = Paint.Cap.ROUND }
 
     // gesture state
-    private enum class G { NONE, CAMERA, ITEMS, RUBBER, CROP, PICK, DRAW, ROTATE, SCALE }
+    private enum class G { NONE, CAMERA, ITEMS, RUBBER, CROP, PICK, DRAW, ROTATE, SCALE, LINK, HANDLE_SCALE, HANDLE_ROTATE }
     private var g = G.NONE
     private var downHit: Item? = null
     private var moved = false
@@ -247,6 +261,25 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     private var beforeFocus: FloatArray? = null
     private var lastArrange = ""
     private var entered = -1L // closed group opened by double-tap
+
+    // links and handles
+    private val linkPainter = LinkPainter()
+    private var linkFrom = -1L
+    private val linkEnd = FloatArray(2) // board coords of the finger while dragging out a link
+    private var handleBase: Map<Long, Item> = emptyMap() // the selection when a handle was grabbed
+    private val handlePivot = FloatArray(2)
+    private var handleStart = 0f // distance to the pivot (scale) or angle (rotate) when grabbed
+    private val handleFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+    private val handleLine = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = 0xFF4FA3FF.toInt() }
+    private val sizeText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textAlign = Paint.Align.CENTER }
+    private val sizeBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xCC1E1E1E.toInt() }
+    private val anchorDot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFF9800.toInt() }
+    private val crossPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
+    private val containerFill = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val tagLine = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val linkBadge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF4F9DFF.toInt() }
+    private val linkIcon by lazy { context.getDrawable(R.drawable.ic_link)!!.mutate().apply { setTint(Color.WHITE) } }
+    private val rotateIcon by lazy { context.getDrawable(R.drawable.ic_rotate_cw)!!.mutate().apply { setTint(0xFF4FA3FF.toInt()) } }
 
     // mouse and touchpad (PureRef's controls)
     private var mouse = false
@@ -305,10 +338,13 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         return out
     }
 
+    /** Can be selected and moved: not locked, and not in a layer locked from "Verrouillage". */
+    fun editable(it: Item) = !it.locked && !(scene.lockVisuals && it.isVisual) && !(scene.lockNodes && it.type == NOTE)
+
     private fun targets(): List<Item> {
         val s = selected()
         if (s.size == 1 && s[0].type == GROUP) return children(s[0].id)
-        return s.ifEmpty { scene.items.filter { !it.locked && it.type != GROUP && it.parent == 0L } }
+        return s.ifEmpty { scene.items.filter { editable(it) && it.type != GROUP && it.parent == 0L } }
     }
 
     private fun camScale() = FloatArray(9).also(cam::getValues)[Matrix.MSCALE_X]
@@ -332,6 +368,10 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
 
     private fun commit() {
         fitGroups()
+        // links whose item is gone go with it
+        val ids = scene.items.mapTo(HashSet()) { it.id }
+        scene.links.removeAll { it.from !in ids || it.to !in ids }
+        if (scene.links.none { it.id == linkSel }) linkSel = -1
         invalidate()
         scene.save()
         host?.selectionChanged()
@@ -360,6 +400,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     }
 
     fun delete() {
+        if (linkSel >= 0) return deleteLink()
         if (selection.isEmpty()) return
         val ids = withDescendants(selection)
         scene.checkpoint()
@@ -375,13 +416,15 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         val copies = scene.items.filter { it.id in ids }.map { it.copy(id = map.getValue(it.id), parent = map[it.parent] ?: it.parent).moveBy(d, d) }
         scene.checkpoint()
         scene.items += copies
+        scene.links += scene.links.filter { it.from in map && it.to in map }.map { it.copy(id = scene.newId(), from = map.getValue(it.from), to = map.getValue(it.to)) }
         select(copies.filter { c -> map.entries.first { it.value == c.id }.key in selection })
         commit()
     }
 
-    fun selectAll() = select(scene.items.filter { !it.locked && it.parent == 0L })
+    fun selectAll() = select(scene.items.filter { editable(it) && it.parent == 0L })
     fun clearSelection() { entered = -1; select(emptyList()) }
     fun select(items: List<Item>) {
+        linkSel = -1
         selection.clear()
         items.mapTo(selection) { it.id }
         invalidate()
@@ -480,6 +523,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         val ids = withDescendants(selection)
         if (ids.isEmpty()) return false
         Boards.clip = scene.items.filter { it.id in ids }
+        Boards.clipLinks = scene.links.filter { it.from in ids && it.to in ids }
         Boards.clipImages = scene.images
         return true
     }
@@ -502,6 +546,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         val copies = clip.map { it.copy(id = map.getValue(it.id), parent = map[it.parent] ?: 0L).moveBy(c[0] - r.centerX(), c[1] - r.centerY()) }
         scene.checkpoint()
         scene.items += copies
+        scene.links += Boards.clipLinks.filter { it.from in map && it.to in map }.map { it.copy(id = scene.newId(), from = map.getValue(it.from), to = map.getValue(it.to)) }
         selection.clear()
         roots.mapTo(selection) { map.getValue(it.id) }
         commit()
@@ -591,10 +636,163 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         }
     }
 
-    fun addNote(text: String, spans: String = "", parentToSelection: Boolean = true) {
+    fun addNote(text: String, spans: String = "", parentToSelection: Boolean = true, node: Boolean = false) {
         val (w, h) = noteSize(text, spans)
-        val parent = if (parentToSelection) selected().singleOrNull()?.takeIf { it.type != NOTE }?.id ?: 0L else 0L
-        place(listOf(Item(scene.newId(), NOTE, w, h, text = text, spans = spans, parent = parent)))
+        val from = selected().singleOrNull()
+        val parent = if (parentToSelection && !node) from?.takeIf { it.type != NOTE }?.id ?: 0L else 0L
+        val n = Item(scene.newId(), NOTE, w, h, text = text, spans = spans, parent = parent, node = node, bgColor = if (node) NODE_BG else 0xCC202020.toInt())
+        place(listOf(n))
+        // a new node hangs off what was selected
+        if (node && from != null) { scene.links += Link(scene.newId(), from.id, n.id); commit() }
+    }
+
+    /** A node where a link was dropped on empty space, linked from [from]. Returns it for editing. */
+    private fun addNodeAt(p: FloatArray, from: Long): Item {
+        val text = context.getString(R.string.node)
+        val (w, h) = noteSize(text)
+        val n = Item(scene.newId(), NOTE, w, h, x = p[0], y = p[1], scale = 0.7f * dp / camScale(), text = text, node = true, bgColor = NODE_BG)
+        scene.checkpoint()
+        scene.items += n
+        scene.links += Link(scene.newId(), from, n.id)
+        select(listOf(n))
+        commit()
+        return n
+    }
+
+    // ---- links
+
+    fun addLink(from: Long, to: Long) {
+        if (from == to || scene.links.any { (it.from == from && it.to == to) || (it.from == to && it.to == from) }) return
+        scene.checkpoint()
+        scene.links += Link(scene.newId(), from, to)
+        commit()
+    }
+
+    private fun editLink(f: (Link) -> Link) {
+        val i = scene.links.indexOfFirst { it.id == linkSel }.takeIf { it >= 0 } ?: return
+        scene.checkpoint()
+        scene.links[i] = f(scene.links[i])
+        commit()
+    }
+
+    fun reverseLink() = editLink { it.copy(from = it.to, to = it.from) }
+    fun toggleBothEnds() = editLink { it.copy(both = !it.both) }
+    fun setLinkColor(c: Int) = editLink { it.copy(color = c) }
+    fun selectedLink() = scene.links.find { it.id == linkSel }
+
+    fun deleteLink() {
+        if (linkSel < 0) return
+        scene.checkpoint()
+        scene.links.removeAll { it.id == linkSel }
+        linkSel = -1
+        commit()
+    }
+
+    private fun curveOf(l: Link): FloatArray? {
+        val a = scene.items.find { it.id == l.from } ?: return null
+        val b = scene.items.find { it.id == l.to } ?: return null
+        return linkCurve(a.bounds(), b.bounds())
+    }
+
+    /** The link under a screen point, if any. */
+    private fun linkAt(sx: Float, sy: Float): Link? {
+        if (scene.lockNodes) return null
+        val tol = 14 * dp
+        return scene.links.lastOrNull { l ->
+            val pts = curveOf(l)?.let(::sample)?.also(cam::mapPoints) ?: return@lastOrNull false
+            distance(pts, sx, sy) < tol
+        }
+    }
+
+    private fun selectLink(l: Link) {
+        selection.clear()
+        linkSel = l.id
+        invalidate()
+        host?.selectionChanged()
+    }
+
+    // ---- quick transforms (the selection bar's rotate and size menus)
+
+    private fun aroundSelection(f: (Item, Float, Float) -> Item) {
+        val sel = selected().filter(::editable).ifEmpty { return }
+        val ids = withDescendants(sel.map { it.id })
+        val r = sel.union()
+        scene.checkpoint()
+        scene.items.replaceAll { if (it.id in ids) f(it, r.centerX(), r.centerY()) else it }
+        commit()
+    }
+
+    fun rotateBy(deg: Float) = aroundSelection { it, cx, cy -> it.transformed(cx, cy, 1f, deg, 0f, 0f) }
+    fun scaleBy(k: Float) = aroundSelection { it, cx, cy -> it.transformed(cx, cy, k, 0f, 0f, 0f) }
+    fun resetRotation() = edit { it.copy(rot = 0f) }
+    fun resetSize() = edit { it.copy(scale = 1f) }
+
+    /** Where the selection (or the selected link's middle) is on screen, for the bar that floats above it. */
+    fun selectionScreenRect(): RectF? {
+        selectedLink()?.let { l ->
+            val c = curveOf(l) ?: return null
+            val p = sample(c, 2).also(cam::mapPoints)
+            return RectF(p[2], p[3], p[2], p[3])
+        }
+        val sel = selected().ifEmpty { return null }
+        return sel.union().also(cam::mapRect)
+    }
+
+    /** Size on the board of what's selected: "1080 × 2400", with a decimal while it isn't a whole number. */
+    private fun sizeLabel(): String {
+        val sel = selected()
+        val one = sel.singleOrNull()
+        val w = one?.let { it.crop.width() * it.scale } ?: sel.union().width()
+        val h = one?.let { it.crop.height() * it.scale } ?: sel.union().height()
+        fun f(v: Float) = if (abs(v - v.roundToInt()) < 0.05f) "${v.roundToInt()}" else String.format("%.1f", v)
+        return "${f(w)} × ${f(h)}"
+    }
+
+    private fun showHandles() = selection.isNotEmpty() && linkSel < 0 && !drawing && cropId < 0 && slides.isEmpty() && !viewOnly && !picking &&
+        tool == TOOL_SELECT && selected().any(::editable)
+
+    /** 0-3 = a corner (top-left, top-right, bottom-right, bottom-left), 4 = the rotate handle, -1 = none. */
+    private fun handleAt(sx: Float, sy: Float): Int {
+        if (!showHandles()) return -1
+        val r = selectionScreenRect() ?: return -1
+        val tol = 22 * dp
+        if (hypot(sx - (r.right + 26 * dp), sy - r.centerY()) < tol) return 4
+        val corners = floatArrayOf(r.left, r.top, r.right, r.top, r.right, r.bottom, r.left, r.bottom)
+        for (i in 0 until 4) if (hypot(sx - corners[i * 2], sy - corners[i * 2 + 1]) < tol) return i
+        return -1
+    }
+
+    private fun grabHandle(i: Int, sx: Float, sy: Float): G {
+        val sel = selected().filter(::editable)
+        val ids = withDescendants(sel.map { it.id })
+        handleBase = scene.items.filter { it.id in ids }.associateBy { it.id }
+        val r = sel.union()
+        val p = toBoard(sx, sy)
+        if (i == 4) {
+            handlePivot[0] = r.centerX(); handlePivot[1] = r.centerY()
+            handleStart = atan2(p[1] - handlePivot[1], p[0] - handlePivot[0])
+            return G.HANDLE_ROTATE
+        }
+        // scaling from a corner keeps the opposite one in place
+        val opposite = floatArrayOf(r.right, r.bottom, r.left, r.bottom, r.left, r.top, r.right, r.top)
+        handlePivot[0] = opposite[i * 2]; handlePivot[1] = opposite[i * 2 + 1]
+        handleStart = hypot(p[0] - handlePivot[0], p[1] - handlePivot[1]).coerceAtLeast(1f)
+        return G.HANDLE_SCALE
+    }
+
+    private fun dragHandle(sx: Float, sy: Float) {
+        val p = toBoard(sx, sy)
+        val px = handlePivot[0]; val py = handlePivot[1]
+        scene.items.replaceAll { item ->
+            val base = handleBase[item.id] ?: return@replaceAll item
+            if (g == G.HANDLE_SCALE) base.transformed(px, py, (hypot(p[0] - px, p[1] - py) / handleStart).coerceIn(0.02f, 50f), 0f, 0f, 0f)
+            else {
+                var d = Math.toDegrees((atan2(p[1] - py, p[0] - px) - handleStart).toDouble()).toFloat()
+                val snap = (d / 45f).roundToInt() * 45f
+                if (abs(d - snap) < 5f) d = snap // sticks at 45° steps
+                base.transformed(px, py, 1f, d, 0f, 0f)
+            }
+        }
     }
 
     /** New items: sized to the screen, packed (PureRef's "select and pack new images"), centered, selected. */
@@ -872,6 +1070,23 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         }
         if (!floating || background == 0) drawGrid(c)
         val s = camScale()
+        if (Prefs.container && scene.items.isNotEmpty()) { // a frame around everything
+            val r = scene.items.union().also(cam::mapRect).apply { inset(-24 * dp, -24 * dp) }
+            containerFill.color = if (Prefs.theme == 1) 0x12000000 else 0x14000000
+            c.drawRoundRect(r, 16 * dp, 16 * dp, containerFill)
+            containerFill.color = if (Prefs.theme == 1) 0x1A000000 else 0x1AFFFFFF
+            containerFill.style = Paint.Style.STROKE; containerFill.strokeWidth = dp
+            c.drawRoundRect(r, 16 * dp, 16 * dp, containerFill)
+            containerFill.style = Paint.Style.FILL
+        }
+        if (Prefs.centerCross) { // the board's origin
+            val o = floatArrayOf(0f, 0f).also(cam::mapPoints)
+            crossPaint.color = if (Prefs.theme == 1) 0x80000000.toInt() else 0x99FFFFFF.toInt()
+            crossPaint.strokeWidth = 1.5f * dp
+            val arm = 14 * dp
+            c.drawLine(o[0] - arm, o[1], o[0] + arm, o[1], crossPaint)
+            c.drawLine(o[0], o[1] - arm, o[0], o[1] + arm, crossPaint)
+        }
         val gray = Prefs.canvasGray
         val now = SystemClock.uptimeMillis()
         var animating = false
@@ -887,6 +1102,12 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
                 c.save(); c.concat(it.matrix()); painter.content(c, it, bmp, 70, gray || it.gray, gif); c.restore()
             }
             painter.item(c, it, bmp, gray, gif)
+            if (it.tag != 0) { // color label
+                c.save(); c.concat(it.matrix())
+                tagLine.color = it.tag; tagLine.strokeWidth = 4 * dp / (it.scale * s)
+                c.drawRect(it.crop, tagLine)
+                c.restore()
+            }
             val sel = it.id in selection || it.id == cropId || (drawing && it.id == drawTarget)
             if (sel || (Prefs.borders == 0 && it.isMedia)) {
                 c.save()
@@ -909,6 +1130,13 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
             }
         }
         for (it in scene.items) if (it.comment.isNotEmpty()) commentBadge(c, it)
+        val items = scene.items
+        drawLinks(c, linkPainter, scene.links, items, 2.5f * dp / s, linkSel, 0xFF4FA3FF.toInt())
+        if (g == G.LINK) items.find { it.id == linkFrom }?.let { a -> // the link being dragged out
+            linkPainter.draw(c, linkCurve(a.bounds(), RectF(linkEnd[0], linkEnd[1], linkEnd[0], linkEnd[1])), 0xFFFF9800.toInt(), 2.5f * dp / s, false, dashed = true)
+        }
+        if (tool == TOOL_CONNECT && !scene.lockNodes) for (it in items) if (it.type != GROUP && editable(it)) // where links attach
+            for (a in anchors(it)) c.drawCircle(a.x, a.y, 4 * dp / s, anchorDot)
         stroke?.takeIf { it.size >= 2 && Prefs.penTool != T_ERASER }?.let { pts ->
             val p = pts.toFloatArray()
             val tool = Prefs.penTool
@@ -916,6 +1144,14 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
                 if (tool == T_PEN) p else floatArrayOf(p[0], p[1], p[p.size - 2], p[p.size - 1])), 255, null)
         }
         c.restore()
+        for (it in scene.items) if (it.url.isNotEmpty()) { // link badge, screen-sized
+            val b = badgeAt(it)
+            c.drawCircle(b[0], b[1], 11 * dp, linkBadge)
+            val r = (7 * dp).toInt()
+            linkIcon.setBounds(b[0].toInt() - r, b[1].toInt() - r, b[0].toInt() + r, b[1].toInt() + r)
+            linkIcon.draw(c)
+        }
+        if (showHandles()) selectionScreenRect()?.let { r -> handles(c, r) }
         if (dropHint) {
             outline.strokeWidth = 4 * dp
             c.drawRect(2 * dp, 2 * dp, width - 2 * dp, height - 2 * dp, outline)
@@ -928,6 +1164,33 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         }
         vids.keys.filter { it !in live }.forEach { vids.remove(it)?.release() }
         if (animating) postInvalidateOnAnimation()
+        host?.boardDrawn()
+    }
+
+    /** Screen point of an item's link badge: just inside its top-left corner. */
+    private fun badgeAt(it: Item): FloatArray {
+        val b = it.bounds().also(cam::mapRect)
+        return floatArrayOf(b.left + 14 * dp, b.top + 14 * dp)
+    }
+
+    /** Corner handles (drag to scale), the rotate handle on the right, and the size under the selection. */
+    private fun handles(c: Canvas, r: RectF) {
+        handleLine.strokeWidth = 1.5f * dp
+        for ((x, y) in listOf(r.left to r.top, r.right to r.top, r.right to r.bottom, r.left to r.bottom)) {
+            c.drawCircle(x, y, 7 * dp, handleFill)
+            c.drawCircle(x, y, 7 * dp, handleLine)
+        }
+        val rx = r.right + 26 * dp
+        c.drawCircle(rx, r.centerY(), 13 * dp, handleFill)
+        val ir = (8 * dp).toInt()
+        rotateIcon.setBounds(rx.toInt() - ir, r.centerY().toInt() - ir, rx.toInt() + ir, r.centerY().toInt() + ir)
+        rotateIcon.draw(c)
+        val label = sizeLabel()
+        sizeText.textSize = 12 * dp
+        val tw = sizeText.measureText(label)
+        val ty = r.bottom + 26 * dp
+        c.drawRoundRect(r.centerX() - tw / 2 - 8 * dp, ty - 15 * dp, r.centerX() + tw / 2 + 8 * dp, ty + 6 * dp, 6 * dp, 6 * dp, sizeBg)
+        c.drawText(label, r.centerX(), ty, sizeText)
     }
 
     private val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFC107.toInt() }
@@ -995,7 +1258,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         return it.strokes.any { s -> distance(s.outline(), p[0], p[1]) < tol + s.width / 2 }
     }
     private fun hitAny(sx: Float, sy: Float) = ordered().lastOrNull { under(it, sx, sy) }
-    private fun hitRaw(sx: Float, sy: Float) = ordered().lastOrNull { !it.locked && under(it, sx, sy) }
+    private fun hitRaw(sx: Float, sy: Float) = ordered().lastOrNull { editable(it) && under(it, sx, sy) }
     private fun hit(sx: Float, sy: Float) = hitRaw(sx, sy)?.let(::resolve)
 
     // centroid x, centroid y, average span, angle of the first two pointers; skip = pointer being lifted
@@ -1064,6 +1327,12 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
                 G.DRAW
             }
             cropId >= 0 -> if (cropDown(e.x, e.y)) G.CROP else G.CAMERA
+            !mouse && handleAt(e.x, e.y) >= 0 -> grabHandle(handleAt(e.x, e.y), e.x, e.y)
+            tool == TOOL_HAND -> G.CAMERA
+            tool == TOOL_CONNECT && !viewOnly -> {
+                val from = if (scene.lockNodes) null else hit(e.x, e.y)?.takeIf { it.type != GROUP }
+                if (from == null) G.CAMERA else { linkFrom = from.id; toBoard(e.x, e.y).copyInto(linkEnd); G.LINK }
+            }
             else -> {
                 downHit = if (Prefs.canvasLocked || viewOnly) null else hit(e.x, e.y)
                 when {
@@ -1080,6 +1349,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     private fun startMove() {
         if (moved) return
         moved = true
+        if (g == G.HANDLE_SCALE || g == G.HANDLE_ROTATE) { scene.checkpoint(); return }
         if (g != G.ITEMS && g != G.ROTATE && g != G.SCALE) return
         val h = downHit ?: return
         if (h.id !in selection) select(listOf(h))
@@ -1106,6 +1376,8 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
             }
             G.CAMERA, G.ITEMS -> transform(e)
             G.ROTATE, G.SCALE -> turnOrScale(e)
+            G.HANDLE_SCALE, G.HANDLE_ROTATE -> dragHandle(e.x, e.y)
+            G.LINK -> toBoard(e.x, e.y).copyInto(linkEnd)
             G.NONE -> {}
         }
     }
@@ -1175,7 +1447,18 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
             G.CAMERA -> when {
                 moved -> scene.save()
                 rightClick -> if (!drawing) contextMenu(e.x, e.y)
-                selection.isNotEmpty() || entered >= 0 -> clearSelection()
+                !drawing && !viewOnly && linkAt(e.x, e.y) != null -> selectLink(linkAt(e.x, e.y)!!)
+                selection.isNotEmpty() || entered >= 0 || linkSel >= 0 -> clearSelection()
+            }
+            G.HANDLE_SCALE, G.HANDLE_ROTATE -> if (moved) commit()
+            G.LINK -> {
+                val to = hit(e.x, e.y)
+                when {
+                    !moved -> to?.let { select(listOf(it)) } // a tap still selects
+                    to != null && to.id != linkFrom && to.type != GROUP -> addLink(linkFrom, to.id)
+                    to == null -> host?.editItem(addNodeAt(linkEnd, linkFrom)) // dropped on empty space: a new node, named right away
+                }
+                linkFrom = -1
             }
             G.RUBBER -> {
                 rubberOn = false
@@ -1207,6 +1490,11 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     }
 
     private fun tap(it: Item, sx: Float, sy: Float) {
+        // the link badge in its corner opens the item's link
+        if (it.url.isNotEmpty() && badgeAt(it).let { b -> hypot(sx - b[0], sy - b[1]) < 18 * dp }) {
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            return
+        }
         // a tap on the note you already selected can tick a checkbox or open a link
         if (it.type == NOTE && selection.size == 1 && it.id in selection && noteTap(it, sx, sy)) return
         select(listOf(it))
@@ -1247,6 +1535,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
 
     private fun longPress(e: MotionEvent) {
         if (moved || mouse || pad || picking || cropId >= 0 || drawing || viewOnly || g == G.NONE) return
+        if (g == G.LINK || g == G.HANDLE_SCALE || g == G.HANDLE_ROTATE || tool == TOOL_HAND) return
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
         val any = hitAny(e.x, e.y)
         val h = downHit
@@ -1277,7 +1566,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         val a = toBoard(min(rubber.left, rubber.right), min(rubber.top, rubber.bottom))
         val b = toBoard(max(rubber.left, rubber.right), max(rubber.top, rubber.bottom))
         val r = RectF(a[0], a[1], b[0], b[1])
-        val hits = scene.items.filter { !it.locked && RectF.intersects(r, it.bounds()) }.map(::resolve)
+        val hits = scene.items.filter { editable(it) && RectF.intersects(r, it.bounds()) }.map(::resolve)
         select((if (add) selected() + hits else hits).distinctBy { it.id })
     }
 

@@ -17,6 +17,7 @@ bold italic underline strikethrough a-arrow-up a-arrow-down baseline highlighter
 list list-ordered list-checks list-indent-increase list-indent-decrease remove-formatting image film image-play message-square
 replace external-link text-cursor-input scissors arrow-down-a-z clock folder-tree shuffle align-horizontal-space-between
 align-vertical-space-between maximize-2 arrow-left-right grid-2x2 sun languages download upload folder folder-plus folder-input arrow-left keyboard
+rotate-cw hand mouse-pointer-2 waypoints workflow tag frame arrow-right-left lock-keyhole
 """.split()
 
 

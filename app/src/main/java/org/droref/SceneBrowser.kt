@@ -133,7 +133,8 @@ class SceneBrowser(
             if (sc !== cur && sc.thumb.exists() && sc.thumb.lastModified() >= sc.edited) { if (key !in thumbs) loadThumb(sc) }
             else {
                 val items = sc.items.toList()
-                loader.execute { sc.writeThumb(items); loadThumb(sc) }
+                val links = sc.links.toList()
+                loader.execute { sc.writeThumb(items, links); loadThumb(sc) }
             }
         }
         (grid.adapter as BaseAdapter).notifyDataSetChanged()
