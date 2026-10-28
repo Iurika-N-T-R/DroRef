@@ -63,8 +63,8 @@
     <string name="focus">Focus</string>
     <string name="crop">Crop</string>
     <string name="reset_crop">Reset crop</string>
-    <string name="flip_h">Flip ↔</string>
-    <string name="flip_v">Flip ↕</string>
+    <string name="flip_h">Flip horizontal</string>
+    <string name="flip_v">Flip vertical</string>
     <string name="gray">Gray</string>
     <string name="opacity">Opacity</string>
     <string name="arrange">Arrange</string>
@@ -287,7 +287,6 @@
     <string name="reset_size">Original size (100 %)</string>
     <string name="double_size">Twice as big</string>
     <string name="half_size">Half as big</string>
-    <string name="all_options">All options…</string>
     <string name="color_tag">Color label</string>
     <string name="item_link">Web link…</string>
     <string name="open_link">Open web link</string>

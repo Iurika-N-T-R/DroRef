@@ -85,7 +85,8 @@ class MainActivity : Activity(), BoardView.Host {
     private var barFloats = false // the selection bar sits above what's selected; mode bars (draw, crop, slideshow) stay at the bottom
     private var focusMode = false
 
-    private fun s(id: Int, vararg args: Any) = getString(id, *args)
+    // formatting only with arguments: a plain "100 %" would otherwise throw
+    private fun s(id: Int, vararg args: Any) = if (args.isEmpty()) getString(id) else getString(id, *args)
 
     override fun attachBaseContext(base: Context) = super.attachBaseContext(base.localized())
 
@@ -444,7 +445,11 @@ class MainActivity : Activity(), BoardView.Host {
     // ---- small menus anchored to their button (instead of a full sheet for everyday actions)
 
     /** One line of a small menu: label, icon at the right; [check] makes it a toggle that keeps the menu open. A null label is a divider. */
-    private class Row(val label: String?, val icon: Int = 0, val check: (() -> Boolean)? = null, val enabled: Boolean = true, val f: () -> Unit = {})
+    private class Row(
+        val label: String?, val icon: Int = 0, val check: (() -> Boolean)? = null, val enabled: Boolean = true,
+        val ticked: Boolean = false, val tint: Int? = null, val header: Int? = null, // header = a section title in that color
+        val f: () -> Unit = {},
+    )
 
     private fun popover(anchor: View, title: String?, rows: List<Row>) {
         val pw = PopupWindow(this)
@@ -461,10 +466,22 @@ class MainActivity : Activity(), BoardView.Host {
                 box.addView(View(this).apply { setBackgroundColor(chipLine) }, LinearLayout.LayoutParams(-1, px(1)).apply { setMargins(px(16), px(4), px(16), px(4)) })
                 continue
             }
+            if (r.header != null) {
+                box.addView(TextView(this).apply {
+                    text = r.label.uppercase(); setTextColor(r.header); textSize = 12f; typeface = Typeface.DEFAULT_BOLD; letterSpacing = 0.06f
+                    setPadding(px(20), px(14), px(20), px(4))
+                })
+                continue
+            }
             val end = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER }
             fun refresh() {
                 val on = r.check?.invoke()
-                end.setImageDrawable(when { on == true -> ic(R.drawable.ic_check, Palette.BLUE); on == false -> null; r.icon != 0 -> ic(r.icon); else -> null })
+                end.setImageDrawable(when {
+                    on == true || (on == null && r.ticked) -> ic(R.drawable.ic_check, Palette.BLUE)
+                    on == false -> null
+                    r.icon != 0 -> ic(r.icon, r.tint ?: chipFg)
+                    else -> null
+                })
             }
             refresh()
             box.addView(LinearLayout(this).apply {
@@ -472,7 +489,7 @@ class MainActivity : Activity(), BoardView.Host {
                 setPadding(px(20), 0, px(14), 0)
                 alpha = if (r.enabled) 1f else 0.4f
                 background = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run { getDrawable(0).also { recycle() } }
-                addView(TextView(this@MainActivity).apply { text = r.label; setTextColor(chipFg); textSize = 15f }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(TextView(this@MainActivity).apply { text = r.label; setTextColor(r.tint ?: chipFg); textSize = 15f }, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(end, LinearLayout.LayoutParams(px(32), px(32)).apply { marginStart = px(16) })
                 if (r.enabled) setOnClickListener { if (r.check == null) pw.dismiss(); r.f(); refresh() }
                 minimumHeight = px(46)
@@ -537,32 +554,14 @@ class MainActivity : Activity(), BoardView.Host {
         popover(anchor, s(R.string.info_title), rows)
     }
 
-    /** Everyday actions in a short list; "all options" opens the full grouped sheet. */
+    /** Everything that can be done to the selection, in one scrolling list, section by section. */
     private fun moreMenu(anchor: View) {
-        val sel = board.selected()
-        val one = sel.singleOrNull()
-        popover(anchor, null, listOfNotNull(
-            Row(s(R.string.front), R.drawable.ic_bring_to_front) { board.toFront() },
-            Row(s(R.string.back), R.drawable.ic_send_to_back) { board.toBack() },
-            Row(null),
-            Row(s(R.string.flip_h), R.drawable.ic_square_split_horizontal) { board.edit { it.copy(flipX = !it.flipX) } },
-            Row(s(R.string.flip_v), R.drawable.ic_square_split_vertical) { board.edit { it.copy(flipY = !it.flipY) } },
-            Row(s(R.string.gray), check = { board.selected().all { it.gray } }) { val g = !board.selected().all { it.gray }; board.edit { it.copy(gray = g) } },
-            Row(null),
-            Row(s(R.string.duplicate), R.drawable.ic_copy) { board.duplicate() },
-            Row(s(R.string.color_tag), R.drawable.ic_tag) {
-                pickColor(s(R.string.color_tag), withNone = true, current = one?.tag?.takeIf { it != 0 }) { c -> board.edit { it.copy(tag = c) } }
-            },
-            Row(s(R.string.item_link), R.drawable.ic_link) {
-                editText(s(R.string.item_link).removeSuffix("…"), one?.url?.ifEmpty { "https://" } ?: "https://", allowEmpty = true) { u ->
-                    val url = u.trim().takeIf { it.isNotEmpty() && it != "https://" }.orEmpty()
-                    board.edit { it.copy(url = url) }
-                }
-            },
-            one?.url?.takeIf { it.isNotEmpty() }?.let { u -> Row(s(R.string.open_link), R.drawable.ic_external_link) { openUrl(u) } },
-            Row(null),
-            Row(s(R.string.all_options), R.drawable.ic_ellipsis) { moreSheet() },
-        ))
+        val rows = ArrayList<Row>()
+        for (sec in moreSections()) {
+            rows += Row(sec.title, header = sec.color)
+            sec.tiles.forEach { t -> rows += Row(t.label, t.icon, ticked = t.checked, tint = t.color) { t.f() } }
+        }
+        popover(anchor, null, rows)
     }
 
     private fun openUrl(u: String) { runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u))) }.onFailure { toast(u) } }
@@ -748,7 +747,7 @@ class MainActivity : Activity(), BoardView.Host {
                 Tile(R.drawable.ic_square, s(R.string.n_area)) { board.normalize("area") },
                 Tile(R.drawable.ic_scaling, s(R.string.n_scale)) { board.normalize("scale") },
                 Tile(R.drawable.ic_arrow_left_right, s(if (Prefs.normalizeFirst) R.string.source_first else R.string.source_average), Prefs.normalizeFirst) {
-                    Prefs.normalizeFirst = !Prefs.normalizeFirst; moreSheet()
+                    Prefs.normalizeFirst = !Prefs.normalizeFirst
                 },
             ))
         }
@@ -768,6 +767,17 @@ class MainActivity : Activity(), BoardView.Host {
             } else null,
             if (one?.type == IMAGE || one?.type == GIF) Tile(R.drawable.ic_replace, s(R.string.replace)) { pickImages(REQ_REPLACE) } else null,
             if (one != null && one.source.startsWith("http")) Tile(R.drawable.ic_external_link, s(R.string.source)) { open(one.source) } else null,
+            Tile(R.drawable.ic_copy_plus, s(R.string.duplicate)) { board.duplicate() },
+            Tile(R.drawable.ic_tag, s(R.string.color_tag), sel.any { it.tag != 0 }) {
+                pickColor(s(R.string.color_tag), withNone = true, current = one?.tag?.takeIf { it != 0 }) { c -> board.edit { it.copy(tag = c) } }
+            },
+            Tile(R.drawable.ic_link, s(R.string.item_link), one?.url?.isNotEmpty() == true) {
+                editText(s(R.string.item_link).removeSuffix("…"), one?.url?.ifEmpty { "https://" } ?: "https://", allowEmpty = true) { u ->
+                    val url = u.trim().takeIf { it.isNotEmpty() && it != "https://" }.orEmpty()
+                    board.edit { it.copy(url = url) }
+                }
+            },
+            one?.url?.takeIf { it.isNotEmpty() }?.let { u -> Tile(R.drawable.ic_external_link, s(R.string.open_link)) { openUrl(u) } },
             Tile(R.drawable.ic_copy, s(R.string.copy)) { copyItems() },
             Tile(R.drawable.ic_scissors, s(R.string.cut)) { if (board.copySelection()) { markClipboard(); board.delete() } },
             Tile(R.drawable.ic_presentation, s(R.string.slideshow)) { board.startSlideshow() },

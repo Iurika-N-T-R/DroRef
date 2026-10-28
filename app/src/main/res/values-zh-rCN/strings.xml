@@ -62,8 +62,8 @@
     <string name="focus">聚焦</string>
     <string name="crop">裁剪</string>
     <string name="reset_crop">重置裁剪</string>
-    <string name="flip_h">翻转 ↔</string>
-    <string name="flip_v">翻转 ↕</string>
+    <string name="flip_h">水平翻转</string>
+    <string name="flip_v">垂直翻转</string>
     <string name="gray">灰度</string>
     <string name="opacity">不透明度</string>
     <string name="arrange">排列</string>
@@ -286,7 +286,6 @@
     <string name="reset_size">原始尺寸 (100 %)</string>
     <string name="double_size">放大两倍</string>
     <string name="half_size">缩小一半</string>
-    <string name="all_options">全部选项…</string>
     <string name="color_tag">颜色标签</string>
     <string name="item_link">网页链接…</string>
     <string name="open_link">打开网页链接</string>

@@ -380,8 +380,8 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         commit()
     }
 
-    /** Changes every selected item, keeping each one's visible center in place. */
-    fun edit(f: (Item) -> Item) = apply(selected().map { it.keepCenter(f(it)) })
+    /** Changes every selected item, keeping each one's visible center in place. Locked ones (picked in the hierarchy) stay as they are. */
+    fun edit(f: (Item) -> Item) = frozen().let { fr -> apply(selected().filter { editable(it, fr) }.map { it.keepCenter(f(it)) }) }
 
     private fun commit() {
         fitGroups()
@@ -463,7 +463,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         commit()
     }
 
-    fun toggleLock() { edit { it.copy(locked = !it.locked) }; clearSelection() }
+    fun toggleLock() { apply(selected().map { it.copy(locked = !it.locked) }); clearSelection() } // not edit(): it must reach locked items to unlock them
     fun unlock(item: Item) { apply(listOf(item.copy(locked = false))); select(listOf(item)) }
     fun beginOpacity() = scene.checkpoint()
     fun setOpacity(v: Float) = apply(selected().map { it.copy(opacity = v) }, undoable = false)
@@ -765,7 +765,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         return "${f(w)} × ${f(h)}"
     }
 
-    private fun showHandles() = selection.isNotEmpty() && linkSel < 0 && !drawing && cropId < 0 && slides.isEmpty() && !viewOnly && !picking &&
+    private fun showHandles() = selection.isNotEmpty() && linkSel < 0 && !drawing && cropId < 0 && slides.isEmpty() && !viewOnly && !picking && !Prefs.canvasLocked &&
         tool == TOOL_SELECT && selected().any(::editable)
 
     /** 0-3 = a corner (top-left, top-right, bottom-right, bottom-left), 4 = the rotate handle, -1 = none. */
@@ -1347,7 +1347,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
             cropId >= 0 -> if (cropDown(e.x, e.y)) G.CROP else G.CAMERA
             !mouse && handleAt(e.x, e.y) >= 0 -> grabHandle(handleAt(e.x, e.y), e.x, e.y)
             tool == TOOL_HAND -> G.CAMERA
-            tool == TOOL_CONNECT && !viewOnly -> {
+            tool == TOOL_CONNECT && !viewOnly && !Prefs.canvasLocked -> {
                 val from = if (scene.lockNodes) null else hit(e.x, e.y)?.takeIf { it.type != GROUP }
                 if (from == null) G.CAMERA else { linkFrom = from.id; toBoard(e.x, e.y).copyInto(linkEnd); G.LINK }
             }
@@ -1541,7 +1541,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         if (picking || cropId >= 0 || drawing || rightClick) return false
         val raw = hitRaw(e.x, e.y)
         val top = raw?.let(::resolve)
-        if (viewOnly) { if (raw == null) focusAll() else focus(listOf(top ?: raw)); return true }
+        if (viewOnly || Prefs.canvasLocked) { if (raw == null) focusAll() else focus(listOf(top ?: raw)); return true } // a locked canvas only looks
         when {
             raw == null -> focusAll()
             top != null && top.id != raw.id && top.type == GROUP -> { entered = top.id; select(listOf(resolve(raw))) } // open the group

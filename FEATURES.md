@@ -78,7 +78,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 
 ## DroRef only (not in PureRef)
 - ✅ Selection handles: corners scale from the opposite corner, a rotate handle (45° snaps), live size on the board under the selection
-- ✅ Floating selection toolbar with small menus: info, rotate 90° / 180° / 270° / reset, size 100 % / ×2 / ×½, more (front, back, flip, gray, duplicate, color label, web link, all options)
+- ✅ Floating selection toolbar with small menus: info, rotate 90° / 180° / 270° / reset, size 100 % / ×2 / ×½, and ⋮ with every option in one scrolling list
 - ✅ Nodes and connections: curved arrows between items that follow them, reverse / both ends / color, drag to empty space for a new linked node; saved as drawings in .pur files
 - ✅ Tool rail: select, hand (view only), connect, draw, lock (visuals or nodes)
 - ✅ Center cross, frame around the content, color labels and web links on items, "#" in copied hex colors (setting)

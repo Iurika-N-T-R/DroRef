@@ -62,8 +62,8 @@
     <string name="focus">초점</string>
     <string name="crop">자르기</string>
     <string name="reset_crop">자르기 초기화</string>
-    <string name="flip_h">뒤집기 ↔</string>
-    <string name="flip_v">뒤집기 ↕</string>
+    <string name="flip_h">좌우 반전</string>
+    <string name="flip_v">상하 반전</string>
     <string name="gray">흑백</string>
     <string name="opacity">불투명도</string>
     <string name="arrange">정렬</string>
@@ -286,7 +286,6 @@
     <string name="reset_size">원본 크기 (100 %)</string>
     <string name="double_size">2배로</string>
     <string name="half_size">절반으로</string>
-    <string name="all_options">모든 옵션…</string>
     <string name="color_tag">색상 라벨</string>
     <string name="item_link">웹 링크…</string>
     <string name="open_link">웹 링크 열기</string>

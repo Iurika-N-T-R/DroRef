@@ -62,8 +62,8 @@
     <string name="focus">フォーカス</string>
     <string name="crop">切り抜き</string>
     <string name="reset_crop">切り抜きをリセット</string>
-    <string name="flip_h">反転 ↔</string>
-    <string name="flip_v">反転 ↕</string>
+    <string name="flip_h">左右反転</string>
+    <string name="flip_v">上下反転</string>
     <string name="gray">グレー</string>
     <string name="opacity">不透明度</string>
     <string name="arrange">整列</string>
@@ -286,7 +286,6 @@
     <string name="reset_size">元のサイズ (100 %)</string>
     <string name="double_size">2 倍に</string>
     <string name="half_size">半分に</string>
-    <string name="all_options">すべてのオプション…</string>
     <string name="color_tag">カラーラベル</string>
     <string name="item_link">Web リンク…</string>
     <string name="open_link">Web リンクを開く</string>

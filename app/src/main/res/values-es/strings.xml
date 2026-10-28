@@ -62,8 +62,8 @@
     <string name="focus">Encuadrar</string>
     <string name="crop">Recortar</string>
     <string name="reset_crop">Restablecer recorte</string>
-    <string name="flip_h">Voltear ↔</string>
-    <string name="flip_v">Voltear ↕</string>
+    <string name="flip_h">Voltear horizontal</string>
+    <string name="flip_v">Voltear vertical</string>
     <string name="gray">Gris</string>
     <string name="opacity">Opacidad</string>
     <string name="arrange">Organizar</string>
@@ -286,7 +286,6 @@
     <string name="reset_size">Tamaño original (100 %)</string>
     <string name="double_size">El doble de grande</string>
     <string name="half_size">La mitad de grande</string>
-    <string name="all_options">Todas las opciones…</string>
     <string name="color_tag">Etiqueta de color</string>
     <string name="item_link">Enlace web…</string>
     <string name="open_link">Abrir enlace web</string>

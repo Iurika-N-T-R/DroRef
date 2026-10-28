@@ -1,1 +1,1 @@
-Locking a group really locks it: the group and everything in it can't be selected or moved; long-press it to unlock. Locked groups don't take dropped items in.
+Fixes the crash of the Size button. Locking a group really locks it and its content (long-press to unlock). The ⋮ menu lists every option in one scrolling list, by section. Flip labels read Flip horizontal / vertical. A locked canvas also locks the selection handles, connections and double-tap edits.

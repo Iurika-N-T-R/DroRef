@@ -62,8 +62,8 @@
     <string name="focus">Cadrer</string>
     <string name="crop">Recadrer</string>
     <string name="reset_crop">Annuler le recadrage</string>
-    <string name="flip_h">Miroir ↔</string>
-    <string name="flip_v">Miroir ↕</string>
+    <string name="flip_h">Miroir horizontal</string>
+    <string name="flip_v">Miroir vertical</string>
     <string name="gray">Gris</string>
     <string name="opacity">Opacité</string>
     <string name="arrange">Ranger</string>
@@ -286,7 +286,6 @@
     <string name="reset_size">Taille d\'origine (100 %)</string>
     <string name="double_size">Deux fois plus grand</string>
     <string name="half_size">Deux fois plus petit</string>
-    <string name="all_options">Toutes les options…</string>
     <string name="color_tag">Étiquette de couleur</string>
     <string name="item_link">Lien web…</string>
     <string name="open_link">Ouvrir le lien web</string>
