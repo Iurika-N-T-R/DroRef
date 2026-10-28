@@ -1,0 +1,1 @@
+The item menu's frame no longer looks cut off: it stays a full rounded card and only its content scrolls, with a fade where there's more.

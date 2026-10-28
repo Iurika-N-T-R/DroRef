@@ -455,7 +455,6 @@ class MainActivity : Activity(), BoardView.Host {
         val pw = PopupWindow(this)
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply { cornerRadius = 16 * dp; setColor(if (light) 0xFAFFFFFF.toInt() else 0xFA2E2E2E.toInt()); setStroke(px(1), chipLine) }
             setPadding(0, px(6), 0, px(6))
         }
         title?.let { box.addView(TextView(this).apply {
@@ -507,7 +506,15 @@ class MainActivity : Activity(), BoardView.Host {
         val x = (if (at[0] + w <= root.width - margin) at[0] else at[0] + anchor.width - w).coerceIn(margin, maxOf(margin, root.width - w - margin))
         val below = at[1] + anchor.height + px(4)
         val y = (if (below + h <= root.height - margin - px(24)) below else at[1] - h - px(4)).coerceIn(margin + px(24), maxOf(margin, root.height - h - margin))
-        pw.contentView = ScrollView(this).apply { isVerticalScrollBarEnabled = false; addView(box) }
+        // the rounded card is the fixed frame; only what's inside scrolls (it used to scroll with the list, cut off at the bottom)
+        pw.contentView = ScrollView(this).apply {
+            isVerticalScrollBarEnabled = false
+            background = GradientDrawable().apply { cornerRadius = 16 * dp; setColor(if (light) 0xFAFFFFFF.toInt() else 0xFA2E2E2E.toInt()); setStroke(px(1), chipLine) }
+            clipToOutline = true
+            isVerticalFadingEdgeEnabled = true // a fade at the edge that has more
+            setFadingEdgeLength(px(28))
+            addView(box)
+        }
         pw.width = w
         pw.height = h
         pw.isFocusable = true
