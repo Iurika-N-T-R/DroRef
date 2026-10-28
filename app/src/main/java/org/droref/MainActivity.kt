@@ -501,7 +501,8 @@ class MainActivity : Activity(), BoardView.Host {
         box.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
         val root = window.decorView
         val margin = px(12)
-        val h = minOf(box.measuredHeight, root.height - 2 * margin - px(48))
+        // a fixed, moderate height: long menus (⋮) scroll inside instead of covering the screen
+        val h = minOf(box.measuredHeight, px(420), (root.height * 0.6f).toInt())
         val at = IntArray(2).also(anchor::getLocationInWindow)
         val x = (if (at[0] + w <= root.width - margin) at[0] else at[0] + anchor.width - w).coerceIn(margin, maxOf(margin, root.width - w - margin))
         val below = at[1] + anchor.height + px(4)

@@ -1,0 +1,1 @@
+Menus: swipe a bottom panel down to close it; the item menu (⋮) keeps a fixed height and scrolls inside.

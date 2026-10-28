@@ -150,7 +150,7 @@ fun Activity.sheet(
     }
 
     val r = 24 * dp
-    val scroll = ScrollView(this).apply {
+    val scroll = SwipeDownScroll(this) { dlg.dismiss() }.apply {
         addView(col)
         background = GradientDrawable().apply { cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f); setColor(bg) }
     }
@@ -164,4 +164,46 @@ fun Activity.sheet(
     }
     dlg.show()
     return dlg
+}
+
+/**
+ * The sheet's scroller: once it's scrolled to the top, dragging down moves the whole sheet,
+ * and letting go far enough (or fast) closes it, like a system bottom sheet.
+ */
+private class SwipeDownScroll(ctx: android.content.Context, val close: () -> Unit) : ScrollView(ctx) {
+    private val slop = android.view.ViewConfiguration.get(ctx).scaledTouchSlop
+    private var downY = 0f
+    private var dragging = false
+    private var velocity: android.view.VelocityTracker? = null
+
+    override fun onInterceptTouchEvent(e: android.view.MotionEvent): Boolean {
+        when (e.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> { downY = e.rawY; dragging = false; velocity?.recycle(); velocity = android.view.VelocityTracker.obtain() }
+            android.view.MotionEvent.ACTION_MOVE -> if (!dragging && scrollY == 0 && e.rawY - downY > slop) { dragging = true; downY = e.rawY }
+        }
+        velocity?.addMovement(e)
+        return dragging || super.onInterceptTouchEvent(e)
+    }
+
+    override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
+        velocity?.addMovement(e)
+        if (!dragging) {
+            // the list itself is at the top and the finger goes down: the sheet follows instead
+            if (e.actionMasked == android.view.MotionEvent.ACTION_MOVE && scrollY == 0 && e.rawY - downY > slop) { dragging = true; downY = e.rawY }
+            else return super.onTouchEvent(e)
+        }
+        val dy = (e.rawY - downY).coerceAtLeast(0f)
+        when (e.actionMasked) {
+            android.view.MotionEvent.ACTION_MOVE -> translationY = dy
+            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                dragging = false
+                val v = velocity?.apply { computeCurrentVelocity(1000) }?.yVelocity ?: 0f
+                val fast = 1000 * resources.displayMetrics.density
+                if (e.actionMasked == android.view.MotionEvent.ACTION_UP && (dy > height / 4f || v > fast))
+                    animate().translationY(height.toFloat()).setDuration(160).withEndAction(close).start()
+                else animate().translationY(0f).setDuration(180).start()
+            }
+        }
+        return true
+    }
 }
