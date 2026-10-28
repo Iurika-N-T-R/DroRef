@@ -74,6 +74,7 @@
     <string name="group_color">群組顏色</string>
     <string name="lock_group">鎖定群組</string>
     <string name="unlock_group">開啟群組</string>
+    <string name="group_locked">群組已鎖定：長按可解鎖</string>
     <string name="parent">設為父層</string>
     <string name="unparent">取消父層</string>
     <string name="front">移至最上層</string>

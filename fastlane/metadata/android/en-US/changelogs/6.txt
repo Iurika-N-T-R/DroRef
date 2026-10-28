@@ -1,0 +1,1 @@
+Locking a group really locks it: the group and everything in it can't be selected or moved; long-press it to unlock. Locked groups don't take dropped items in.

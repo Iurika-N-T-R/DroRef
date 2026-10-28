@@ -338,13 +338,30 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         return out
     }
 
-    /** Can be selected and moved: not locked, and not in a layer locked from "Verrouillage". */
-    fun editable(it: Item) = !it.locked && !(scene.lockVisuals && it.isVisual) && !(scene.lockNodes && it.type == NOTE)
+    /** Locked items and everything under them: a locked group locks its content too. */
+    private fun frozen(): Set<Long> {
+        val locked = scene.items.filter { it.locked }.map { it.id }
+        return if (locked.isEmpty()) emptySet() else withDescendants(locked)
+    }
+
+    /** The topmost locked item that [it] is (or is inside), for "unlock?" on a long press. */
+    private fun lockedOwner(it: Item): Item? {
+        val m = byId()
+        var top: Item? = null
+        var p: Item? = it
+        var n = 0
+        while (p != null && n++ < 64) { if (p.locked) top = p; p = m[p.parent] }
+        return top
+    }
+
+    /** Can be selected and moved: not locked (nor inside something locked), and not in a layer locked from "Verrouillage". */
+    fun editable(it: Item, frozen: Set<Long> = frozen()) = it.id !in frozen && !(scene.lockVisuals && it.isVisual) && !(scene.lockNodes && it.type == NOTE)
 
     private fun targets(): List<Item> {
         val s = selected()
         if (s.size == 1 && s[0].type == GROUP) return children(s[0].id)
-        return s.ifEmpty { scene.items.filter { editable(it) && it.type != GROUP && it.parent == 0L } }
+        val f = frozen()
+        return s.ifEmpty { scene.items.filter { editable(it, f) && it.type != GROUP && it.parent == 0L } }
     }
 
     private fun camScale() = FloatArray(9).also(cam::getValues)[Matrix.MSCALE_X]
@@ -421,7 +438,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         commit()
     }
 
-    fun selectAll() = select(scene.items.filter { editable(it) && it.parent == 0L })
+    fun selectAll() = frozen().let { f -> select(scene.items.filter { editable(it, f) && it.parent == 0L }) }
     fun clearSelection() { entered = -1; select(emptyList()) }
     fun select(items: List<Item>) {
         linkSel = -1
@@ -1135,7 +1152,8 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         if (g == G.LINK) items.find { it.id == linkFrom }?.let { a -> // the link being dragged out
             linkPainter.draw(c, linkCurve(a.bounds(), RectF(linkEnd[0], linkEnd[1], linkEnd[0], linkEnd[1])), 0xFFFF9800.toInt(), 2.5f * dp / s, false, dashed = true)
         }
-        if (tool == TOOL_CONNECT && !scene.lockNodes) for (it in items) if (it.type != GROUP && editable(it)) // where links attach
+        val f = frozen()
+        if (tool == TOOL_CONNECT && !scene.lockNodes) for (it in items) if (it.type != GROUP && editable(it, f)) // where links attach
             for (a in anchors(it)) c.drawCircle(a.x, a.y, 4 * dp / s, anchorDot)
         stroke?.takeIf { it.size >= 2 && Prefs.penTool != T_ERASER }?.let { pts ->
             val p = pts.toFloatArray()
@@ -1258,7 +1276,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         return it.strokes.any { s -> distance(s.outline(), p[0], p[1]) < tol + s.width / 2 }
     }
     private fun hitAny(sx: Float, sy: Float) = ordered().lastOrNull { under(it, sx, sy) }
-    private fun hitRaw(sx: Float, sy: Float) = ordered().lastOrNull { editable(it) && under(it, sx, sy) }
+    private fun hitRaw(sx: Float, sy: Float): Item? { val f = frozen(); return ordered().lastOrNull { editable(it, f) && under(it, sx, sy) } }
     private fun hit(sx: Float, sy: Float) = hitRaw(sx, sy)?.let(::resolve)
 
     // centroid x, centroid y, average span, angle of the first two pointers; skip = pointer being lifted
@@ -1355,7 +1373,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         if (h.id !in selection) select(listOf(h))
         if (Prefs.bringToFront) bringSelectionToFront()
         scene.checkpoint()
-        val ids = withDescendants(selected().filter { !it.locked }.map { it.id })
+        val ids = withDescendants(selected().filter { editable(it) }.map { it.id })
         raw = HashMap(scene.items.filter { it.id in ids }.associateBy { it.id })
         raw.values.toList().union().let { pivot = floatArrayOf(it.centerX(), it.centerY()) }
         turned = 0f; scaled = 1f
@@ -1540,7 +1558,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         val any = hitAny(e.x, e.y)
         val h = downHit
         when {
-            any != null && any.locked && h == null -> { g = G.NONE; host?.lockedPressed(any) }
+            h == null && any?.let(::lockedOwner) != null -> { g = G.NONE; host?.lockedPressed(lockedOwner(any!!)!!) }
             h != null && selection.size == 1 && h.id in selection && h.isMedia && dragOut(h) -> g = G.NONE
             h != null -> { toggle(h); g = G.NONE }
             Prefs.canvasLocked -> { g = G.NONE; host?.canvasMenu() }
@@ -1566,7 +1584,8 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         val a = toBoard(min(rubber.left, rubber.right), min(rubber.top, rubber.bottom))
         val b = toBoard(max(rubber.left, rubber.right), max(rubber.top, rubber.bottom))
         val r = RectF(a[0], a[1], b[0], b[1])
-        val hits = scene.items.filter { editable(it) && RectF.intersects(r, it.bounds()) }.map(::resolve)
+        val f = frozen()
+        val hits = scene.items.filter { editable(it, f) && RectF.intersects(r, it.bounds()) }.map(::resolve)
         select((if (add) selected() + hits else hits).distinctBy { it.id })
     }
 
@@ -1582,7 +1601,8 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         if (!Prefs.dragIntoGroups) return
         val moved = raw.keys
         val m = byId()
-        val groups = ordered().filter { it.type == GROUP && it.id !in moved }
+        val f = frozen()
+        val groups = ordered().filter { it.type == GROUP && it.id !in moved && editable(it, f) } // a locked group takes nothing in
         scene.items.replaceAll { item ->
             if (item.id !in moved || item.parent in moved) return@replaceAll item
             val b = item.bounds()

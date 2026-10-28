@@ -74,6 +74,7 @@
     <string name="group_color">Couleur du groupe</string>
     <string name="lock_group">Verrouiller le groupe</string>
     <string name="unlock_group">Ouvrir le groupe</string>
+    <string name="group_locked">Groupe verrouillé : appui long dessus pour le déverrouiller</string>
     <string name="parent">Parenter</string>
     <string name="unparent">Détacher</string>
     <string name="front">Devant</string>

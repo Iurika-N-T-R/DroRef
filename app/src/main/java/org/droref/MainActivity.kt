@@ -662,9 +662,8 @@ class MainActivity : Activity(), BoardView.Host {
                 barIcon(R.drawable.ic_repeat, s(R.string.loop)) { loopEditor(one, vid) }
             }
             one?.type == GROUP -> {
-                barIcon(if (one.closed) R.drawable.ic_lock_open else R.drawable.ic_lock, s(if (one.closed) R.string.unlock_group else R.string.lock_group)) {
-                    board.edit { if (it.type == GROUP) it.copy(closed = !one.closed) else it }
-                }
+                // a real lock: the group and its content stop moving; long-press it to unlock
+                barIcon(R.drawable.ic_lock, s(R.string.lock_group)) { board.toggleLock(); toast(s(R.string.group_locked)) }
                 barIcon(R.drawable.ic_ungroup, s(R.string.ungroup)) { board.ungroup() }
             }
             one?.isMedia == true -> barIcon(R.drawable.ic_crop, s(R.string.crop)) { board.startCrop() }

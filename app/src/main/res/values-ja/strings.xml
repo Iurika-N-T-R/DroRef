@@ -74,6 +74,7 @@
     <string name="group_color">グループの色</string>
     <string name="lock_group">グループをロック</string>
     <string name="unlock_group">グループを開く</string>
+    <string name="group_locked">グループをロックしました：長押しで解除</string>
     <string name="parent">親子付け</string>
     <string name="unparent">親子付け解除</string>
     <string name="front">前面へ</string>

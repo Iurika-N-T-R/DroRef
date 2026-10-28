@@ -74,6 +74,7 @@
     <string name="group_color">Color del grupo</string>
     <string name="lock_group">Bloquear grupo</string>
     <string name="unlock_group">Abrir grupo</string>
+    <string name="group_locked">Grupo bloqueado: mantén pulsado para desbloquearlo</string>
     <string name="parent">Emparentar</string>
     <string name="unparent">Desemparentar</string>
     <string name="front">Delante</string>

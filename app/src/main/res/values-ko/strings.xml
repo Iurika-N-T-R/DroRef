@@ -74,6 +74,7 @@
     <string name="group_color">그룹 색상</string>
     <string name="lock_group">그룹 잠금</string>
     <string name="unlock_group">그룹 열기</string>
+    <string name="group_locked">그룹이 잠겼습니다: 길게 눌러 잠금 해제</string>
     <string name="parent">부모 지정</string>
     <string name="unparent">부모 해제</string>
     <string name="front">앞으로</string>

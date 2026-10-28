@@ -75,6 +75,7 @@
     <string name="group_color">Group color</string>
     <string name="lock_group">Lock group</string>
     <string name="unlock_group">Open group</string>
+    <string name="group_locked">Group locked: long-press it to unlock</string>
     <string name="parent">Parent</string>
     <string name="unparent">Unparent</string>
     <string name="front">Front</string>

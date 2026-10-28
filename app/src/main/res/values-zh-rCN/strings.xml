@@ -74,6 +74,7 @@
     <string name="group_color">组颜色</string>
     <string name="lock_group">锁定组</string>
     <string name="unlock_group">打开组</string>
+    <string name="group_locked">组已锁定：长按可解锁</string>
     <string name="parent">设为父级</string>
     <string name="unparent">取消父级</string>
     <string name="front">置于顶层</string>

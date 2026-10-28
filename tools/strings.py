@@ -91,6 +91,7 @@ S = {
 "group_color": ["Group color", "Couleur du groupe", "Color del grupo", "グループの色", "그룹 색상", "组颜色", "群組顏色"],
 "lock_group": ["Lock group", "Verrouiller le groupe", "Bloquear grupo", "グループをロック", "그룹 잠금", "锁定组", "鎖定群組"],
 "unlock_group": ["Open group", "Ouvrir le groupe", "Abrir grupo", "グループを開く", "그룹 열기", "打开组", "開啟群組"],
+"group_locked": ["Group locked: long-press it to unlock", "Groupe verrouillé : appui long dessus pour le déverrouiller", "Grupo bloqueado: mantén pulsado para desbloquearlo", "グループをロックしました：長押しで解除", "그룹이 잠겼습니다: 길게 눌러 잠금 해제", "组已锁定：长按可解锁", "群組已鎖定：長按可解鎖"],
 "parent": ["Parent", "Parenter", "Emparentar", "親子付け", "부모 지정", "设为父级", "設為父層"],
 "unparent": ["Unparent", "Détacher", "Desemparentar", "親子付け解除", "부모 해제", "取消父级", "取消父層"],
 "front": ["Front", "Devant", "Delante", "前面へ", "앞으로", "置于顶层", "移至最上層"],
