@@ -1,0 +1,1 @@
+Simplifier: new Blur slider, a plain Gaussian blur. Use it alone to only blur the canvas, or with the other sliders. Detail now goes up to full size.

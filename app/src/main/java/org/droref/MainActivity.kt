@@ -879,6 +879,7 @@ class MainActivity : Activity(), BoardView.Host {
             })
         }
         slider(R.string.detail, Simp.DETAIL, { it.detail }, { s, v -> s.copy(detail = v) }, off = -1)
+        slider(R.string.blur, Simp.BLUR, { it.blur }, { s, v -> s.copy(blur = v) }, off = 0)
         slider(R.string.flat_shapes, Simp.FLAT, { it.flat }, { s, v -> s.copy(flat = v) }, off = 0)
         slider(R.string.values, Simp.TONES, { it.tones }, { s, v -> s.copy(tones = if (v < 2) 0 else v) }, off = 1)
     }

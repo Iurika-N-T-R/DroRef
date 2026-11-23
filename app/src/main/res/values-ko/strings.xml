@@ -67,6 +67,7 @@
     <string name="gray">흑백</string>
     <string name="simplify">단순화</string>
     <string name="detail">디테일</string>
+    <string name="blur">흐림</string>
     <string name="flat_shapes">평면화</string>
     <string name="values">명도 단계</string>
     <string name="save_preset">프리셋 저장…</string>

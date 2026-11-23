@@ -67,6 +67,7 @@
     <string name="gray">グレー</string>
     <string name="simplify">簡略化</string>
     <string name="detail">ディテール</string>
+    <string name="blur">ぼかし</string>
     <string name="flat_shapes">平坦化</string>
     <string name="values">明度段階</string>
     <string name="save_preset">プリセットを保存…</string>

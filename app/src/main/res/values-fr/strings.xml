@@ -67,6 +67,7 @@
     <string name="gray">Gris</string>
     <string name="simplify">Simplifier</string>
     <string name="detail">Détail</string>
+    <string name="blur">Flou</string>
     <string name="flat_shapes">Aplats</string>
     <string name="values">Valeurs</string>
     <string name="save_preset">Enregistrer le préréglage…</string>

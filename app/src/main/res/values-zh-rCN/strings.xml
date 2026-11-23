@@ -67,6 +67,7 @@
     <string name="gray">灰度</string>
     <string name="simplify">简化</string>
     <string name="detail">细节</string>
+    <string name="blur">模糊</string>
     <string name="flat_shapes">平涂</string>
     <string name="values">明度层次</string>
     <string name="save_preset">保存预设…</string>
