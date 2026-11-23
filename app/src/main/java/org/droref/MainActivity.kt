@@ -11,6 +11,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.widget.PopupWindow
+import android.widget.PopupMenu
 import android.widget.ScrollView
 import android.widget.HorizontalScrollView
 import android.widget.Button
@@ -837,51 +838,60 @@ class MainActivity : Activity(), BoardView.Host {
         fun set(n: Simp) { p = n; Prefs.simp = n.toString(); board.simpChanged() }
         simpPanel.removeAllViews()
         val list = simpPresets()
-        val chips = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        list.forEachIndexed { i, (name, v) ->
-            chips.addView(TextView(this).apply {
-                text = name; setTextColor(chipFg); textSize = 13f; maxLines = 1
-                setPadding(px(12), px(6), px(12), px(6))
-                background = GradientDrawable().apply { cornerRadius = 14 * dp; setColor(if (v == p) Palette.BLUE and 0x55FFFFFF else 0); setStroke(px(1), chipLine) }
-                layoutParams = LinearLayout.LayoutParams(-2, -2).apply { setMargins(px(3), 0, px(3), 0) }
-                setOnClickListener { set(v); renderSimpPanel() }
-                setOnLongClickListener {
-                    AlertDialog.Builder(this@MainActivity).setTitle(name).setPositiveButton(R.string.delete) { _, _ ->
-                        saveSimpPresets(list.filterIndexed { j, _ -> j != i }); renderSimpPanel()
-                    }.setNegativeButton(R.string.cancel, null).show(); true
-                }
-            })
-        }
+        val current = list.indexOfFirst { it.second == p }
         fun small(icon: Int, desc: String, f: () -> Unit) = ImageView(this).apply {
             setImageDrawable(ic(icon)); scaleType = ImageView.ScaleType.CENTER; tip(this, desc); setOnClickListener { f() }
             layoutParams = LinearLayout.LayoutParams(px(36), px(36))
         }
+        // presets: a dropdown (apply, or delete the one in use), + saves the current settings
+        val pick = TextView(this).apply {
+            text = "${if (current >= 0) list[current].first else s(R.string.custom)}  ▾"
+            setTextColor(chipFg); textSize = 14f; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(px(12), px(8), px(12), px(8))
+            background = GradientDrawable().apply { cornerRadius = 14 * dp; setStroke(px(1), chipLine) }
+            setOnClickListener { v ->
+                PopupMenu(this@MainActivity, v).apply {
+                    list.forEachIndexed { i, (name, _) -> menu.add(0, i, i, name).apply { isCheckable = true; isChecked = i == current } }
+                    if (current >= 0) menu.add(1, -1, list.size, "${s(R.string.delete)} « ${list[current].first} »")
+                    setOnMenuItemClickListener { m ->
+                        if (m.itemId >= 0) set(list[m.itemId].second) else saveSimpPresets(list.filterIndexed { j, _ -> j != current })
+                        renderSimpPanel(); true
+                    }
+                }.show()
+            }
+        }
         simpPanel.addView(LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            addView(HorizontalScrollView(this@MainActivity).apply { isHorizontalScrollBarEnabled = false; addView(chips) }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(pick, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(px(6), 0, px(4), 0) })
             addView(small(R.drawable.ic_plus, s(R.string.save_preset)) {
                 editText(s(R.string.save_preset), "") { n -> saveSimpPresets(simpPresets() + (n.replace('|', ' ').replace('\n', ' ').trim() to p)); renderSimpPanel() }
             })
             addView(small(R.drawable.ic_x, s(R.string.close)) { simpPanel.visibility = View.GONE })
         })
-        fun slider(label: Int, range: IntRange, get: (Simp) -> Int, put: (Simp, Int) -> Simp, off: Int) {
-            val t = TextView(this).apply { setTextColor(chipFg); textSize = 13f; setPadding(px(12), px(4), px(12), 0) }
-            fun show(v: Int) { t.text = "${s(label)} : ${if (v <= off) s(R.string.off) else v}" }
-            show(get(p))
-            simpPanel.addView(t)
-            simpPanel.addView(SeekBar(this).apply {
-                max = range.last - range.first; progress = get(p) - range.first
+        // one row per filter, in the order they run: eye turns it on / off (its value stays), the arrow runs it earlier
+        val labels = mapOf('d' to R.string.detail, 'b' to R.string.blur, 'f' to R.string.flat_shapes, 'v' to R.string.values)
+        p.steps.forEachIndexed { i, st0 ->
+            var st = st0
+            val range = Simp.RANGE.getValue(st.k)
+            val t = TextView(this).apply { setTextColor(chipFg); textSize = 13f }
+            fun show() { t.text = "${s(labels.getValue(st.k))} : ${st.v}"; t.alpha = if (st.on) 1f else 0.45f }
+            show()
+            val sb = SeekBar(this).apply {
+                max = range.last - range.first; progress = st.v - range.first; isEnabled = st.on; alpha = if (st.on) 1f else 0.45f
                 setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                    override fun onProgressChanged(sb: SeekBar, v: Int, user: Boolean) { if (user) { show(v + range.first); set(put(p, v + range.first)) } }
+                    override fun onProgressChanged(sb: SeekBar, v: Int, user: Boolean) { if (user) { st = st.copy(v = v + range.first); show(); set(p.with(st)) } }
                     override fun onStartTrackingTouch(sb: SeekBar) {}
                     override fun onStopTrackingTouch(sb: SeekBar) { renderSimpPanel() } // re-marks the preset that matches, if any
                 })
+            }
+            simpPanel.addView(LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(small(if (st.on) R.drawable.ic_eye else R.drawable.ic_eye_off, s(labels.getValue(st.k))) { set(p.with(st.copy(on = !st.on))); renderSimpPanel() })
+                addView(t, LinearLayout.LayoutParams(0, -2, 1f))
+                if (i >= 2) addView(small(R.drawable.ic_chevron_left, s(R.string.move_up)) { set(p.up(st.k)); renderSimpPanel() }.apply { rotation = 90f })
             })
+            simpPanel.addView(sb)
         }
-        slider(R.string.detail, Simp.DETAIL, { it.detail }, { s, v -> s.copy(detail = v) }, off = -1)
-        slider(R.string.blur, Simp.BLUR, { it.blur }, { s, v -> s.copy(blur = v) }, off = 0)
-        slider(R.string.flat_shapes, Simp.FLAT, { it.flat }, { s, v -> s.copy(flat = v) }, off = 0)
-        slider(R.string.values, Simp.TONES, { it.tones }, { s, v -> s.copy(tones = if (v < 2) 0 else v) }, off = 1)
     }
 
     private fun selectionWithChildren() = board.withDescendants(board.selection).let { ids -> board.scene.items.filter { it.id in ids } }

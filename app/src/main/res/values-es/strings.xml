@@ -71,6 +71,7 @@
     <string name="flat_shapes">Planos</string>
     <string name="values">Valores</string>
     <string name="save_preset">Guardar ajuste…</string>
+    <string name="custom">Personalizado</string>
     <string name="simp_masses">Grandes masas</string>
     <string name="simp_blockin">Encaje</string>
     <string name="simp_shapes">Formas</string>

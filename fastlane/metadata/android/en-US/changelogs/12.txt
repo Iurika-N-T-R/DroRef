@@ -1,0 +1,1 @@
+Simplifier: turn each filter on or off with its eye (its value stays), change their order with the arrow, pick presets from a dropdown. Blur is much finer: 1 is now a light touch.

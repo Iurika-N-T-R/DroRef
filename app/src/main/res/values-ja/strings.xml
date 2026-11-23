@@ -71,6 +71,7 @@
     <string name="flat_shapes">平坦化</string>
     <string name="values">明度段階</string>
     <string name="save_preset">プリセットを保存…</string>
+    <string name="custom">カスタム</string>
     <string name="simp_masses">大きな塊</string>
     <string name="simp_blockin">ブロックイン</string>
     <string name="simp_shapes">形</string>

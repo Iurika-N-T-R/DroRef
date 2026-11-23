@@ -77,7 +77,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 - 🔜 Custom theme colors, rebinding shortcuts
 
 ## DroRef only (not in PureRef)
-- ✅ Reference simplifier on the whole canvas (palette button, Alt+Q): detail / Gaussian blur / flat shapes / value bands sliders in a floating panel, live, color kept; your own reusable presets (tap to apply, long-press to delete) · 🔜 GIF / video
+- ✅ Reference simplifier on the whole canvas (palette button, Alt+Q): detail / Gaussian blur / flat shapes / value bands sliders in a floating panel, live, color kept; each filter on / off and reorderable; your own reusable presets in a dropdown · 🔜 GIF / video
 - ✅ Selection handles: corners scale from the opposite corner, a rotate handle (45° snaps), live size on the board under the selection
 - ✅ Floating selection toolbar with small menus: info, rotate 90° / 180° / 270° / reset, size 100 % / ×2 / ×½, and ⋮ with every option in one scrolling list
 - ✅ Nodes and connections: curved arrows between items that follow them, reverse / both ends / color, drag to empty space for a new linked node; saved as drawings in .pur files

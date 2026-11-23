@@ -5,38 +5,68 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Reference simplifier settings. [detail]: working size in px (smaller = fewer details, blocky);
- *  [blur]: Gaussian blur, in half-percents of the image's long side, so it looks the same at any detail (0 = off);
- *  [flat]: Kuwahara radius, textures merge into flat masses (0 = off); [tones]: value bands (0 = off). */
-data class Simp(val detail: Int, val flat: Int, val tones: Int, val blur: Int = 0) {
-    override fun toString() = "$detail,$flat,$tones,$blur" // stored in settings and presets; older ones have no blur
+/** One filter of the simplifier: [k] is 'd' detail (working size in px, always first), 'b' blur, 'f' flat shapes, 'v' values.
+ *  An off filter keeps its value, so turning it back on brings it back as it was. */
+data class Step(val k: Char, val v: Int, val on: Boolean = true)
+
+/** Reference simplifier settings: detail, then the other filters in the order they run. */
+data class Simp(val steps: List<Step>) {
+    val detail get() = steps.first { it.k == 'd' }
+    override fun toString() = steps.joinToString(" ") { "${if (it.on) "" else "-"}${it.k}${it.v}" } // "d96 b2 -f3 v4"
+    fun with(s: Step) = Simp(steps.map { if (it.k == s.k) s else it })
+
+    /** Runs filter [k] one place earlier; detail stays first. */
+    fun up(k: Char): Simp {
+        val i = steps.indexOfFirst { it.k == k }
+        return if (i <= 1) this else Simp(steps.toMutableList().apply { add(i - 1, removeAt(i)) })
+    }
+
+    private fun clamped() = Simp(steps.map { it.copy(v = it.v.coerceIn(RANGE.getValue(it.k))) })
 
     companion object {
-        val DETAIL = 16..1024; val BLUR = 0..20; val FLAT = 0..8; val TONES = 0..16
-        fun parse(s: String) = s.split(",").mapNotNull { it.trim().toIntOrNull() }.takeIf { it.size == 3 || it.size == 4 }
-            ?.let { v -> Simp(v[0].coerceIn(DETAIL), v[1].coerceIn(FLAT), if (v[2] < 2) 0 else v[2].coerceAtMost(TONES.last), v.getOrElse(3) { 0 }.coerceIn(BLUR)) }
+        /** Blur and flat shapes are in 1/1000 and 1/200 of the image's long side, so they look the same at any detail. */
+        val RANGE = mapOf('d' to 16..1024, 'b' to 1..50, 'f' to 1..8, 'v' to 2..16)
+
+        /** 0 turns a filter off. */
+        fun of(detail: Int, blur: Int, flat: Int, tones: Int) = Simp(listOf(Step('d', detail),
+            Step('b', max(blur, 1), blur > 0), Step('f', max(flat, 1), flat > 0), Step('v', max(tones, 2), tones >= 2))).clamped()
+
+        fun parse(s: String): Simp? {
+            if (',' in s) { // 1.4.0 – 1.4.2: "detail,flat,tones[,blur]", blur then in 1/200
+                val v = s.split(",").mapNotNull { it.trim().toIntOrNull() }.takeIf { it.size == 3 || it.size == 4 } ?: return null
+                return of(v[0], v.getOrElse(3) { 0 } * 5, v[1], v[2])
+            }
+            val st = s.trim().split(" ").mapNotNull { t ->
+                val b = t.removePrefix("-")
+                b.firstOrNull()?.takeIf { it in RANGE }?.let { k -> b.drop(1).toIntOrNull()?.let { Step(k, it, !t.startsWith("-")) } }
+            }
+            if (st.map { it.k }.sorted() != RANGE.keys.sorted()) return null
+            return Simp(st.filter { it.k == 'd' } + st.filter { it.k != 'd' }).clamped()
+        }
     }
 }
 
 /** Starting presets, coarse to fine; the user's own replace them once saved. */
-val DEFAULT_SIMPS = listOf(Simp(48, 2, 3), Simp(96, 3, 4), Simp(160, 3, 6), Simp(256, 2, 10))
+val DEFAULT_SIMPS = listOf(Simp.of(48, 0, 4, 3), Simp.of(96, 0, 3, 4), Simp.of(160, 0, 2, 6), Simp.of(256, 0, 1, 10))
 
-/** Shrink → blur → Kuwahara → enlarge smoothly → value bands. Keeps hue and saturation. */
+/** Shrink to [Simp.detail], enlarge smoothly to a working size of at least 512 px (so blur steps and band edges stay fine),
+ *  then run the filters that are on, in their order. Keeps hue and saturation. */
 fun simplify(src: Bitmap, p: Simp): Bitmap {
-    val k = min(1f, p.detail / max(src.width, src.height).toFloat())
-    val w = max(1, (src.width * k).roundToInt()); val h = max(1, (src.height * k).roundToInt())
+    val side = max(src.width, src.height)
+    val s = if (p.detail.on) min(p.detail.v, side) else min(side, 1024) // ponytail: 1024 px cap per image, the Kuwahara tables grow with it
+    val ws = if (p.detail.on) max(s, min(512, side)) else s
+    val w = max(1, (src.width * s / side.toFloat()).roundToInt()); val h = max(1, (src.height * s / side.toFloat()).roundToInt())
+    val W = max(1, (src.width * ws / side.toFloat()).roundToInt()); val H = max(1, (src.height * ws / side.toFloat()).roundToInt())
     val small = Bitmap.createScaledBitmap(src, w, h, true)
-    val px = IntArray(w * h).also { small.getPixels(it, 0, w, 0, 0, w, h) }
-    if (small !== src) small.recycle()
-    if (p.blur > 0) gaussian(px, w, h, max(1, (p.blur * max(w, h) / 200f).roundToInt()))
-    val flat = if (p.flat > 0) kuwahara(px, w, h, p.flat) else px
-    val tmp = Bitmap.createBitmap(flat, w, h, Bitmap.Config.ARGB_8888)
-    val n = max(1, 1024 / max(w, h)) // ponytail: enlarged to ~1024 px so value bands get smooth edges; fixed, as the board's quality cap is per image anyway
-    val up = if (n > 1) Bitmap.createScaledBitmap(tmp, w * n, h * n, true).also { tmp.recycle() } else tmp
-    if (p.tones == 0) return up
-    val out = IntArray(up.width * up.height).also { up.getPixels(it, 0, up.width, 0, 0, up.width, up.height) }
-    posterizeValue(out, p.tones)
-    return Bitmap.createBitmap(out, up.width, up.height, Bitmap.Config.ARGB_8888).also { up.recycle() }
+    val work = if (W != w || H != h) Bitmap.createScaledBitmap(small, W, H, true).also { if (small !== src) small.recycle() } else small
+    var px = IntArray(W * H).also { work.getPixels(it, 0, W, 0, 0, W, H) }
+    if (work !== src) work.recycle()
+    for (st in p.steps) if (st.on) when (st.k) {
+        'b' -> gaussian(px, W, H, max(1, (st.v * ws / 1000f).roundToInt()))
+        'f' -> px = kuwahara(px, W, H, max(1, (st.v * ws / 200f).roundToInt()))
+        'v' -> posterizeValue(px, st.v)
+    }
+    return Bitmap.createBitmap(px, W, H, Bitmap.Config.ARGB_8888)
 }
 
 /** Gaussian blur, in place: three box blurs in a row come within a few percent of it, at O(1) per pixel whatever [r]. */

@@ -71,6 +71,7 @@
     <string name="flat_shapes">平涂</string>
     <string name="values">明度层次</string>
     <string name="save_preset">保存预设…</string>
+    <string name="custom">自定义</string>
     <string name="simp_masses">大块面</string>
     <string name="simp_blockin">铺大色</string>
     <string name="simp_shapes">形体</string>
