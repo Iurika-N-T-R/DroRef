@@ -11,7 +11,6 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.widget.PopupWindow
-import android.widget.PopupMenu
 import android.widget.ScrollView
 import android.widget.HorizontalScrollView
 import android.widget.Button
@@ -843,29 +842,27 @@ class MainActivity : Activity(), BoardView.Host {
             setImageDrawable(ic(icon)); scaleType = ImageView.ScaleType.CENTER; tip(this, desc); setOnClickListener { f() }
             layoutParams = LinearLayout.LayoutParams(px(36), px(36))
         }
-        // presets: a dropdown (apply, or delete the one in use), + saves the current settings
+        // presets: a dropdown in the app's own menu style (apply, save the current settings, delete the one in use)
         val pick = TextView(this).apply {
             text = "${if (current >= 0) list[current].first else s(R.string.custom)}  ▾"
             setTextColor(chipFg); textSize = 14f; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
             setPadding(px(12), px(8), px(12), px(8))
             background = GradientDrawable().apply { cornerRadius = 14 * dp; setStroke(px(1), chipLine) }
             setOnClickListener { v ->
-                PopupMenu(this@MainActivity, v).apply {
-                    list.forEachIndexed { i, (name, _) -> menu.add(0, i, i, name).apply { isCheckable = true; isChecked = i == current } }
-                    if (current >= 0) menu.add(1, -1, list.size, "${s(R.string.delete)} « ${list[current].first} »")
-                    setOnMenuItemClickListener { m ->
-                        if (m.itemId >= 0) set(list[m.itemId].second) else saveSimpPresets(list.filterIndexed { j, _ -> j != current })
-                        renderSimpPanel(); true
-                    }
-                }.show()
+                popover(v, null, list.mapIndexed { i, (name, sp) -> Row(name, ticked = i == current) { set(sp); renderSimpPanel() } } + listOfNotNull(
+                    Row(null),
+                    Row(s(R.string.save_preset), R.drawable.ic_plus) {
+                        editText(s(R.string.save_preset), "") { n -> saveSimpPresets(simpPresets() + (n.replace('|', ' ').replace('\n', ' ').trim() to p)); renderSimpPanel() }
+                    },
+                    if (current >= 0) Row("${s(R.string.delete)} « ${list[current].first} »", R.drawable.ic_trash, tint = Palette.RED) {
+                        saveSimpPresets(list.filterIndexed { j, _ -> j != current }); renderSimpPanel()
+                    } else null,
+                ))
             }
         }
         simpPanel.addView(LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(pick, LinearLayout.LayoutParams(0, -2, 1f).apply { setMargins(px(6), 0, px(4), 0) })
-            addView(small(R.drawable.ic_plus, s(R.string.save_preset)) {
-                editText(s(R.string.save_preset), "") { n -> saveSimpPresets(simpPresets() + (n.replace('|', ' ').replace('\n', ' ').trim() to p)); renderSimpPanel() }
-            })
             addView(small(R.drawable.ic_x, s(R.string.close)) { simpPanel.visibility = View.GONE })
         })
         // one row per filter, in the order they run: eye turns it on / off (its value stays), the arrow runs it earlier

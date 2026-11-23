@@ -1,0 +1,1 @@
+The simplifier's preset dropdown now uses DroRef's own menu style instead of the system one; it also saves the current settings and deletes the preset in use.
