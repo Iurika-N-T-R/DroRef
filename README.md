@@ -65,6 +65,7 @@ Boards move between the two apps as `.pur` files: *File → Open .pur*, *Save*, 
 | 🖼️ | **Infinite board** | Images, videos, GIFs, notes, drawings — pan, zoom, rotate, scale, group |
 | 📂 | **PureRef compatible** | Open and save `.pur` files |
 | 🪟 | **Always on top** | Float the board over your drawing app, with opacity and click-through for tracing |
+| 🎨 | **Reference simplifier** | Squint at any image: flat shapes and value bands, color kept, your own presets |
 | 🔗 | **Nodes & connections** | Link items with curved arrows that follow them |
 | 📥 | **Drag & drop** | From the gallery, browser or files in split screen — and back out |
 | ⌨️ | **Keyboard & mouse** | PureRef's shortcuts, command palette, in-app guide (Ctrl+H) |
@@ -83,6 +84,7 @@ Boards move between the two apps as `.pur` files: *File → Open .pur*, *Save*, 
 - Tap to select. Drag to move; pinch or twist with two fingers to scale and rotate.
 - Long-press an item to add it to the selection. Long-press empty space and drag to select a rectangle; release without dragging for the canvas panel.
 - What's selected gets corner handles (drag to scale from the opposite corner), a rotate handle on the right (sticks at 45°), its size on the board underneath, and a short toolbar floating just above it (long-press an icon to see its name): info, rotate (90° / 180° / 270° / reset), size (100 % / ×2 / ×½), more and delete. "More" lists everything else in one scrolling list, by section: Transform, Arrange, Align, Normalize, Layers & groups, Item (duplicate, color label, web link, copy, cut, export…).
+- **Simplify** (in More → Transform, or *Alt+Q*) turns a reference into its big shapes so you can block in first, then add detail: *Detail* blurs (like squinting), *Flat shapes* merges textures into flat masses, *Values* groups lights and darks into a few bands, and colors stay. It changes live; save your settings as presets (tap to apply, long-press to delete).
 - **Nodes and connections**: with *connect*, drag from one item to another to link them with a curved arrow that follows both; let go on empty space to create a new node there. Tap a connection to reverse it, put arrows at both ends, recolor or delete it. *Save as .pur* turns connections into drawings, since PureRef has none.
 - **My scenes** (tap the scene name, or *Ctrl+Alt+L*) shows every scene as a preview; long-press one to rename it or move it into a folder. *Ctrl+Shift+L* jumps back to the previous scene.
 - *Always on top* floats the board over your drawing app. Its bar has opacity, transparent-to-touch (for tracing), background off (only the images float), and a pin to show it only over one app (Android asks once for usage access).

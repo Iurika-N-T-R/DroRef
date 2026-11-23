@@ -1,0 +1,1 @@
+New: reference simplifier (Alt+Q or More → Transform). Turns an image into its big shapes to block in first: Detail (squint blur), Flat shapes, Values (light/dark bands), colors kept. Changes live; save your own presets.

@@ -66,6 +66,15 @@
     <string name="flip_h">Flip horizontal</string>
     <string name="flip_v">Flip vertical</string>
     <string name="gray">Gray</string>
+    <string name="simplify">Simplify</string>
+    <string name="detail">Detail</string>
+    <string name="flat_shapes">Flat shapes</string>
+    <string name="values">Values</string>
+    <string name="save_preset">Save preset…</string>
+    <string name="simp_masses">Big masses</string>
+    <string name="simp_blockin">Block-in</string>
+    <string name="simp_shapes">Shapes</string>
+    <string name="simp_detail">Fine detail</string>
     <string name="opacity">Opacity</string>
     <string name="arrange">Arrange</string>
     <string name="align">Align</string>

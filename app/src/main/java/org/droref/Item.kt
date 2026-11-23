@@ -101,6 +101,7 @@ data class Item(
     val tag: Int = 0,                      // color label drawn around it; 0 = none
     val url: String = "",                  // link opened from its badge
     val node: Boolean = false,             // note shown as a node (rounded box, for links)
+    val simplify: String = "",             // reference simplifier settings (Simp); "" = off
 ) {
     /** Content coords -> board coords. */
     fun matrix() = Matrix().apply {
@@ -175,7 +176,7 @@ data class Item(
         put("strokes", JSONArray(strokes.map { it.toJson() }))
         put("loopA", loopA.toDouble()); put("loopB", loopB.toDouble())
         put("noteWidth", noteWidth.toDouble()); put("comment", comment)
-        put("tag", tag); put("url", url); put("node", node)
+        put("tag", tag); put("url", url); put("node", node); put("simplify", simplify)
     }
 
     companion object {
@@ -193,7 +194,7 @@ data class Item(
                 o.optLong("parent"), o.optBoolean("closed", true), o.optString("spans"),
                 if (st == null) emptyList() else List(st.length()) { Stroke.fromJson(st.getJSONObject(it)) },
                 f("loopA", 0f), f("loopB", 1f), f("noteWidth", 0f), o.optString("comment"),
-                o.optInt("tag"), o.optString("url"), o.optBoolean("node"),
+                o.optInt("tag"), o.optString("url"), o.optBoolean("node"), o.optString("simplify"),
             )
         }
     }

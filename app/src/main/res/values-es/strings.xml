@@ -65,6 +65,15 @@
     <string name="flip_h">Voltear horizontal</string>
     <string name="flip_v">Voltear vertical</string>
     <string name="gray">Gris</string>
+    <string name="simplify">Simplificar</string>
+    <string name="detail">Detalle</string>
+    <string name="flat_shapes">Planos</string>
+    <string name="values">Valores</string>
+    <string name="save_preset">Guardar ajuste…</string>
+    <string name="simp_masses">Grandes masas</string>
+    <string name="simp_blockin">Encaje</string>
+    <string name="simp_shapes">Formas</string>
+    <string name="simp_detail">Detalle fino</string>
     <string name="opacity">Opacidad</string>
     <string name="arrange">Organizar</string>
     <string name="align">Alinear</string>

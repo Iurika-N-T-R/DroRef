@@ -16,8 +16,8 @@ android {
         applicationId = "com.reflow.iurika"
         minSdk = 24
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.3.3"
+        versionCode = 9
+        versionName = "1.4.0"
     }
     signingConfigs {
         if (keystore != null) create("release") {

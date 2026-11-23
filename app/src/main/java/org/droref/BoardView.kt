@@ -176,7 +176,8 @@ fun renderItems(items: List<Item>, images: File, maxSide: Int, gray: Boolean, li
     for (it in drawOrder(items)) {
         val f = File(images, it.file)
         val b = when (it.type) {
-            IMAGE, GIF -> decode(f, (max(it.w, it.h) * it.scale * s).roundToInt().coerceIn(64, 8192))
+            IMAGE -> decode(f, (max(it.w, it.h) * it.scale * s).roundToInt().coerceIn(64, 8192))?.let { d -> Simp.parse(it.simplify)?.let { p -> simplify(d, p).also { d.recycle() } } ?: d }
+            GIF -> decode(f, (max(it.w, it.h) * it.scale * s).roundToInt().coerceIn(64, 8192))
             VIDEO -> videoFrame(f)
             else -> null
         }
@@ -233,6 +234,8 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     private val painter = Painter()
     private val bitmaps = HashMap<String, Bitmap>()
     private val loading = HashSet<String>()
+    private val simple = HashMap<String, Pair<String, Bitmap>>() // file -> (settings, simplified)
+    private val simpling = HashSet<String>()
     private val loader = Executors.newSingleThreadExecutor()
     private val gifs = HashMap<Long, Gif>()
     private val vids = HashMap<Long, Vid>()
@@ -318,7 +321,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         releaseMedia()
         stopSlideshow()
         scene = s
-        bitmaps.clear(); loading.clear(); selection.clear()
+        bitmaps.clear(); loading.clear(); simple.clear(); simpling.clear(); selection.clear()
         cropId = -1; focused = null; lastArrange = ""; entered = -1; drawing = false
         invalidate()
         host?.selectionChanged()
@@ -466,6 +469,8 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     fun toggleLock() { apply(selected().map { it.copy(locked = !it.locked) }); clearSelection() } // not edit(): it must reach locked items to unlock them
     fun unlock(item: Item) { apply(listOf(item.copy(locked = false))); select(listOf(item)) }
     fun beginOpacity() = scene.checkpoint()
+    /** Live simplifier change on selected images; call beginOpacity() first for the undo step. */
+    fun setSimplify(s: String) = apply(selected().filter { it.type == IMAGE }.map { it.copy(simplify = s) }, undoable = false)
     fun setOpacity(v: Float) = apply(selected().map { it.copy(opacity = v) }, undoable = false)
     fun editNote(id: Long, text: String, spans: String) = scene.items.find { it.id == id }?.let { apply(listOf(it.keepCenter(it.withText(text, spans)))) }
     fun rename(item: Item, name: String) = apply(listOf(item.copy(name = name)))
@@ -1065,7 +1070,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     private fun bitmap(it: Item): Bitmap? {
         val f = File(scene.images, it.file)
         val key = f.path
-        bitmaps[key]?.let { b -> return b }
+        bitmaps[key]?.let { b -> return if (it.type == IMAGE && it.simplify.isNotEmpty()) simplified(key, b, it.simplify) else b }
         if (loading.add(key)) {
             val video = it.type == VIDEO
             loader.execute {
@@ -1075,6 +1080,19 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
             }
         }
         return null
+    }
+
+    /** The simplified bitmap, one per image file. While settings change, the last result shows and only the newest
+     *  settings get computed, so dragging a slider doesn't queue up work. ponytail: still images only, GIF/video would need a GPU shader. */
+    private fun simplified(key: String, src: Bitmap, s: String): Bitmap {
+        val have = simple[key]
+        if (have?.first == s) return have.second
+        val p = Simp.parse(s) ?: return src
+        if (simpling.add(key)) loader.execute {
+            val b = simplify(src, p)
+            post { simpling.remove(key); simple.put(key, s to b)?.second?.recycle(); invalidate() }
+        }
+        return have?.second ?: src
     }
 
     override fun onDraw(c: Canvas) {

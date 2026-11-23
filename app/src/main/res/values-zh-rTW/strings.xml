@@ -65,6 +65,15 @@
     <string name="flip_h">水平翻轉</string>
     <string name="flip_v">垂直翻轉</string>
     <string name="gray">灰階</string>
+    <string name="simplify">簡化</string>
+    <string name="detail">細節</string>
+    <string name="flat_shapes">平塗</string>
+    <string name="values">明度層次</string>
+    <string name="save_preset">儲存預設…</string>
+    <string name="simp_masses">大塊面</string>
+    <string name="simp_blockin">鋪大色</string>
+    <string name="simp_shapes">形體</string>
+    <string name="simp_detail">細部</string>
     <string name="opacity">不透明度</string>
     <string name="arrange">排列</string>
     <string name="align">對齊</string>

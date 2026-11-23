@@ -46,6 +46,7 @@ object Prefs {
     var container by bool("container", false)     // a frame around everything on the board
     var hexHash by bool("hexHash", true)          // color picker copies "#RRGGBB" (off: "RRGGBB")
     var normalizeFirst by bool("normalizeFirst", false)
+    var simpPresets by str("simpPresets", "")     // simplifier presets, "name|detail,flat,tones" per line; "" = built-in ones
 
     // settings screen (defaults follow PureRef's)
     var theme by int("theme", 0)                  // 0 dark, 1 light, 2 glass

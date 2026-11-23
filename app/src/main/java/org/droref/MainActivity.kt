@@ -12,6 +12,8 @@ import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.widget.PopupWindow
 import android.widget.ScrollView
+import android.widget.HorizontalScrollView
+import android.widget.Button
 import kotlin.math.roundToInt
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
@@ -727,6 +729,7 @@ class MainActivity : Activity(), BoardView.Host {
             Tile(R.drawable.ic_rotate_ccw, s(R.string.reset)) { board.edit { it.copy(scale = 1f, rot = 0f, flipX = false, flipY = false) } },
             Tile(R.drawable.ic_contrast, s(R.string.gray), sel.all { it.gray }) { board.edit { it.copy(gray = !it.gray) } },
             Tile(R.drawable.ic_blend, s(R.string.opacity)) { opacity() },
+            if (sel.any { it.type == IMAGE }) Tile(R.drawable.ic_palette, s(R.string.simplify), sel.any { it.type == IMAGE && it.simplify.isNotEmpty() }) { simplifyDialog() } else null,
             if (media) sel.filter { it.isMedia }.all { it.nearest }.let { px -> Tile(R.drawable.ic_grid_2x2, s(R.string.pixelated), px) { board.edit { if (it.isMedia) it.copy(nearest = !px) else it } } } else null,
             Tile(R.drawable.ic_crosshair, s(R.string.focus)) { board.focus(board.selected()) },
         ))
@@ -794,6 +797,68 @@ class MainActivity : Activity(), BoardView.Host {
             Tile(R.drawable.ic_trash, s(R.string.delete), color = Palette.RED) { board.delete() },
         ))
         return out
+    }
+
+    private fun simpPresets(): List<Pair<String, Simp>> =
+        Prefs.simpPresets.lines().mapNotNull { l -> l.split("|").takeIf { it.size == 2 }?.let { (n, v) -> Simp.parse(v)?.let { n to it } } }
+            .ifEmpty { listOf(R.string.simp_masses, R.string.simp_blockin, R.string.simp_shapes, R.string.simp_detail).map(::s).zip(DEFAULT_SIMPS) }
+
+    private fun saveSimpPresets(l: List<Pair<String, Simp>>) { Prefs.simpPresets = l.joinToString("\n") { "${it.first}|${it.second}" } }
+
+    /** Reference simplifier: three sliders, live on the selected images, and the user's presets
+     *  (tap: apply, long-press: delete, "Save preset" keeps the current settings). */
+    private fun simplifyDialog() {
+        val imgs = board.selected().filter { it.type == IMAGE }
+        if (imgs.isEmpty()) return
+        var p = Simp.parse(imgs.first().simplify) ?: DEFAULT_SIMPS[1]
+        board.beginOpacity()
+        board.setSimplify(p.toString())
+        val refresh = mutableListOf<() -> Unit>()
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, 16, 0, 0) }
+        val chips = LinearLayout(this)
+        fun set(n: Simp) { p = n; board.setSimplify(n.toString()) }
+        fun showChips() {
+            chips.removeAllViews()
+            val list = simpPresets()
+            list.forEachIndexed { i, (name, v) ->
+                chips.addView(Button(this, null, android.R.attr.borderlessButtonStyle).apply {
+                    text = name; isAllCaps = false
+                    setOnClickListener { set(v); refresh.forEach { it() } }
+                    setOnLongClickListener {
+                        AlertDialog.Builder(this@MainActivity).setTitle(name).setPositiveButton(R.string.delete) { _, _ ->
+                            saveSimpPresets(list.filterIndexed { j, _ -> j != i }); showChips()
+                        }.setNegativeButton(R.string.cancel, null).show(); true
+                    }
+                })
+            }
+        }
+        showChips()
+        box.addView(HorizontalScrollView(this).apply { setPadding(32, 0, 32, 0); addView(chips) })
+        fun slider(label: Int, range: IntRange, get: (Simp) -> Int, put: (Simp, Int) -> Simp, off: Int) {
+            val t = TextView(this).apply { setPadding(48, 16, 48, 0) }
+            fun show(v: Int) { t.text = "${s(label)} : ${if (v <= off) s(R.string.off) else v}" }
+            val sb = SeekBar(this).apply {
+                max = range.last - range.first; setPadding(48, 24, 48, 24)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(sb: SeekBar, v: Int, user: Boolean) { show(v + range.first); if (user) set(put(p, v + range.first)) }
+                    override fun onStartTrackingTouch(sb: SeekBar) {}
+                    override fun onStopTrackingTouch(sb: SeekBar) {}
+                })
+            }
+            refresh += { sb.progress = get(p) - range.first; show(get(p)) }
+            box.addView(t); box.addView(sb)
+        }
+        slider(R.string.detail, Simp.DETAIL, { it.detail }, { s, v -> s.copy(detail = v) }, off = -1)
+        slider(R.string.flat_shapes, Simp.FLAT, { it.flat }, { s, v -> s.copy(flat = v) }, off = 0)
+        slider(R.string.values, Simp.TONES, { it.tones }, { s, v -> s.copy(tones = if (v < 2) 0 else v) }, off = 1)
+        refresh.forEach { it() }
+        AlertDialog.Builder(this).setTitle(R.string.simplify).setView(ScrollView(this).apply { addView(box) })
+            .setPositiveButton(R.string.done) { _, _ -> selectionChanged() }
+            .setNegativeButton(R.string.off) { _, _ -> board.setSimplify(""); selectionChanged() }
+            .setNeutralButton(R.string.save_preset) { _, _ ->
+                editText(s(R.string.save_preset), "") { n -> saveSimpPresets(simpPresets() + (n.replace('|', ' ').replace('\n', ' ').trim() to p)) }
+                selectionChanged()
+            }.show()
     }
 
     private fun selectionWithChildren() = board.withDescendants(board.selection).let { ids -> board.scene.items.filter { it.id in ids } }
@@ -1566,6 +1631,7 @@ class MainActivity : Activity(), BoardView.Host {
             Key(KeyEvent.KEYCODE_C, C or A or S, s(R.string.crop)) { if (board.selected().singleOrNull()?.isMedia == true) board.startCrop() },
             Key(KeyEvent.KEYCODE_C, C or S, s(R.string.reset_crop)) { board.resetCrop() },
             Key(KeyEvent.KEYCODE_G, A, s(R.string.gray)) { val g = board.selected().all { it.gray }; board.edit { it.copy(gray = !g) } },
+            Key(KeyEvent.KEYCODE_Q, A, s(R.string.simplify)) { simplifyDialog() },
             Key(KeyEvent.KEYCODE_T, A, s(R.string.pixelated)) { val px = board.selected().filter { it.isMedia }.all { it.nearest }; board.edit { if (it.isMedia) it.copy(nearest = !px) else it } },
             Key(KeyEvent.KEYCODE_L, A, s(R.string.lock)) { board.toggleLock() },
         )

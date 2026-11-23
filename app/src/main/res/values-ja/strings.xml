@@ -65,6 +65,15 @@
     <string name="flip_h">左右反転</string>
     <string name="flip_v">上下反転</string>
     <string name="gray">グレー</string>
+    <string name="simplify">簡略化</string>
+    <string name="detail">ディテール</string>
+    <string name="flat_shapes">平坦化</string>
+    <string name="values">明度段階</string>
+    <string name="save_preset">プリセットを保存…</string>
+    <string name="simp_masses">大きな塊</string>
+    <string name="simp_blockin">ブロックイン</string>
+    <string name="simp_shapes">形</string>
+    <string name="simp_detail">細部</string>
     <string name="opacity">不透明度</string>
     <string name="arrange">整列</string>
     <string name="align">揃える</string>
