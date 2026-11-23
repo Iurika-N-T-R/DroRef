@@ -164,7 +164,7 @@ fun drawOrder(items: List<Item>): List<Item> {
 }
 
 /** Renders items into one bitmap, longest side at most [maxSide]. Call off the UI thread. */
-fun renderItems(items: List<Item>, images: File, maxSide: Int, gray: Boolean, links: List<Link> = emptyList()): Bitmap {
+fun renderItems(items: List<Item>, images: File, maxSide: Int, gray: Boolean, links: List<Link> = emptyList(), simp: Simp? = null): Bitmap {
     val r = items.union()
     val s = min(maxSide / max(r.width(), r.height()).coerceAtLeast(1f), 4f)
     val out = Bitmap.createBitmap(max(1, (r.width() * s).roundToInt()), max(1, (r.height() * s).roundToInt()), Bitmap.Config.ARGB_8888)
@@ -176,7 +176,7 @@ fun renderItems(items: List<Item>, images: File, maxSide: Int, gray: Boolean, li
     for (it in drawOrder(items)) {
         val f = File(images, it.file)
         val b = when (it.type) {
-            IMAGE -> decode(f, (max(it.w, it.h) * it.scale * s).roundToInt().coerceIn(64, 8192))?.let { d -> Simp.parse(it.simplify)?.let { p -> simplify(d, p).also { d.recycle() } } ?: d }
+            IMAGE -> decode(f, (max(it.w, it.h) * it.scale * s).roundToInt().coerceIn(64, 8192))?.let { d -> if (simp != null) simplify(d, simp).also { d.recycle() } else d }
             GIF -> decode(f, (max(it.w, it.h) * it.scale * s).roundToInt().coerceIn(64, 8192))
             VIDEO -> videoFrame(f)
             else -> null
@@ -469,8 +469,8 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     fun toggleLock() { apply(selected().map { it.copy(locked = !it.locked) }); clearSelection() } // not edit(): it must reach locked items to unlock them
     fun unlock(item: Item) { apply(listOf(item.copy(locked = false))); select(listOf(item)) }
     fun beginOpacity() = scene.checkpoint()
-    /** Live simplifier change on selected images; call beginOpacity() first for the undo step. */
-    fun setSimplify(s: String) = apply(selected().filter { it.type == IMAGE }.map { it.copy(simplify = s) }, undoable = false)
+    /** The simplifier was turned on or off, or its settings changed. Off frees the simplified copies. */
+    fun simpChanged() { if (!Prefs.simpOn) simple.clear(); invalidate() }
     fun setOpacity(v: Float) = apply(selected().map { it.copy(opacity = v) }, undoable = false)
     fun editNote(id: Long, text: String, spans: String) = scene.items.find { it.id == id }?.let { apply(listOf(it.keepCenter(it.withText(text, spans)))) }
     fun rename(item: Item, name: String) = apply(listOf(item.copy(name = name)))
@@ -1070,7 +1070,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     private fun bitmap(it: Item): Bitmap? {
         val f = File(scene.images, it.file)
         val key = f.path
-        bitmaps[key]?.let { b -> return if (it.type == IMAGE && it.simplify.isNotEmpty()) simplified(key, b, it.simplify) else b }
+        bitmaps[key]?.let { b -> return if (it.type == IMAGE && Prefs.simpOn) simplified(key, b, Prefs.simp) else b }
         if (loading.add(key)) {
             val video = it.type == VIDEO
             loader.execute {
@@ -1090,7 +1090,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         val p = Simp.parse(s) ?: return src
         if (simpling.add(key)) loader.execute {
             val b = simplify(src, p)
-            post { simpling.remove(key); simple.put(key, s to b)?.second?.recycle(); invalidate() }
+            post { simpling.remove(key); simple[key] = s to b; invalidate() }
         }
         return have?.second ?: src
     }

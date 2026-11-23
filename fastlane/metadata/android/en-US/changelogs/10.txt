@@ -1,0 +1,1 @@
+Simplifier reworked: it now applies to the whole canvas and turns on / off with the palette button (top-right, next to the eye) or Alt+Q. Its settings sit in a floating panel over the board, so every change shows live. Long-press the button to show or hide the panel.

@@ -79,6 +79,8 @@ class MainActivity : Activity(), BoardView.Host {
     private lateinit var titleView: TextView
     private lateinit var menuBtn: ImageView
     private lateinit var eyeBtn: ImageView
+    private lateinit var simpBtn: ImageView
+    private lateinit var simpPanel: LinearLayout
     private lateinit var addBtn: ImageView
     private lateinit var topLeft: LinearLayout
     private lateinit var topRight: LinearLayout
@@ -162,7 +164,20 @@ class MainActivity : Activity(), BoardView.Host {
         topLeft = LinearLayout(this).apply { addView(menuBtn); addView(titleView) }
         eyeBtn = round(R.drawable.ic_eye, s(R.string.focus_mode)) { setFocusMode(!focusMode) }
         undoBtns = listOf(round(R.drawable.ic_undo_2, s(R.string.undo)) { board.undo() }, round(R.drawable.ic_redo_2, s(R.string.redo)) { board.redo() })
-        topRight = LinearLayout(this).apply { undoBtns.forEach(::addView); addView(eyeBtn) }
+        // simplifier: tap turns it on / off for the whole canvas, long-press shows / hides its panel
+        simpBtn = round(R.drawable.ic_palette, s(R.string.simplify)) { setSimp(!Prefs.simpOn) }.apply {
+            setOnLongClickListener {
+                when { !Prefs.simpOn -> setSimp(true); simpPanel.visibility == View.VISIBLE -> simpPanel.visibility = View.GONE; else -> { simpPanel.visibility = View.VISIBLE; renderSimpPanel() } }
+                true
+            }
+        }
+        simpPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; visibility = View.GONE
+            background = GradientDrawable().apply { cornerRadius = 16 * dp; setColor(chipBg); setStroke(px(1), chipLine) }
+            elevation = 8 * dp; setPadding(px(6), px(6), px(6), px(10))
+            isClickable = true // touches on the panel don't reach the board
+        }
+        topRight = LinearLayout(this).apply { undoBtns.forEach(::addView); addView(simpBtn); addView(eyeBtn) }
         addBtn = round(R.drawable.ic_plus, s(R.string.add_section)) {}.apply {
             setOnClickListener { addMenu(it) }
             layoutParams = FrameLayout.LayoutParams(px(56), px(56), Gravity.BOTTOM or Gravity.END).apply { setMargins(0, 0, px(16), px(16)) }
@@ -174,6 +189,7 @@ class MainActivity : Activity(), BoardView.Host {
                 addView(topRight, LinearLayout.LayoutParams(-2, -2))
             }, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply { setMargins(px(8), px(8), px(8), 0) })
             addView(info, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { setMargins(px(16), px(64), px(16), 0) })
+            addView(simpPanel, FrameLayout.LayoutParams(px(300), -2, Gravity.TOP or Gravity.END).apply { setMargins(0, px(64), px(12), 0) })
             addView(bar, FrameLayout.LayoutParams(-2, px(52), Gravity.TOP or Gravity.START)) // placed by placeBar()
             addView(addBtn)
             rail = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL }
@@ -190,6 +206,7 @@ class MainActivity : Activity(), BoardView.Host {
         board.setOnDragListener { _, e -> onDrag(e) }
         setContentView(FrameLayout(this).apply { addView(board); addView(ui) })
         renderRail()
+        if (Prefs.simpOn) simpBtn.setImageDrawable(ic(R.drawable.ic_palette, Palette.BLUE)) // stays on between launches, panel closed
         edgeToEdge() // needs the window's views, so after setContentView
         remember(scene)
         if (state == null) handle(intent)
@@ -729,7 +746,6 @@ class MainActivity : Activity(), BoardView.Host {
             Tile(R.drawable.ic_rotate_ccw, s(R.string.reset)) { board.edit { it.copy(scale = 1f, rot = 0f, flipX = false, flipY = false) } },
             Tile(R.drawable.ic_contrast, s(R.string.gray), sel.all { it.gray }) { board.edit { it.copy(gray = !it.gray) } },
             Tile(R.drawable.ic_blend, s(R.string.opacity)) { opacity() },
-            if (sel.any { it.type == IMAGE }) Tile(R.drawable.ic_palette, s(R.string.simplify), sel.any { it.type == IMAGE && it.simplify.isNotEmpty() }) { simplifyDialog() } else null,
             if (media) sel.filter { it.isMedia }.all { it.nearest }.let { px -> Tile(R.drawable.ic_grid_2x2, s(R.string.pixelated), px) { board.edit { if (it.isMedia) it.copy(nearest = !px) else it } } } else null,
             Tile(R.drawable.ic_crosshair, s(R.string.focus)) { board.focus(board.selected()) },
         ))
@@ -805,60 +821,66 @@ class MainActivity : Activity(), BoardView.Host {
 
     private fun saveSimpPresets(l: List<Pair<String, Simp>>) { Prefs.simpPresets = l.joinToString("\n") { "${it.first}|${it.second}" } }
 
-    /** Reference simplifier: three sliders, live on the selected images, and the user's presets
-     *  (tap: apply, long-press: delete, "Save preset" keeps the current settings). */
-    private fun simplifyDialog() {
-        val imgs = board.selected().filter { it.type == IMAGE }
-        if (imgs.isEmpty()) return
-        var p = Simp.parse(imgs.first().simplify) ?: DEFAULT_SIMPS[1]
-        board.beginOpacity()
-        board.setSimplify(p.toString())
-        val refresh = mutableListOf<() -> Unit>()
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, 16, 0, 0) }
-        val chips = LinearLayout(this)
-        fun set(n: Simp) { p = n; board.setSimplify(n.toString()) }
-        fun showChips() {
-            chips.removeAllViews()
-            val list = simpPresets()
-            list.forEachIndexed { i, (name, v) ->
-                chips.addView(Button(this, null, android.R.attr.borderlessButtonStyle).apply {
-                    text = name; isAllCaps = false
-                    setOnClickListener { set(v); refresh.forEach { it() } }
-                    setOnLongClickListener {
-                        AlertDialog.Builder(this@MainActivity).setTitle(name).setPositiveButton(R.string.delete) { _, _ ->
-                            saveSimpPresets(list.filterIndexed { j, _ -> j != i }); showChips()
-                        }.setNegativeButton(R.string.cancel, null).show(); true
-                    }
-                })
-            }
+    /** Reference simplifier on the whole canvas. Turning it on shows its panel. */
+    private fun setSimp(on: Boolean) {
+        Prefs.simpOn = on
+        simpBtn.setImageDrawable(ic(R.drawable.ic_palette, if (on) Palette.BLUE else chipFg))
+        simpPanel.visibility = if (on) View.VISIBLE else View.GONE
+        if (on) renderSimpPanel()
+        board.simpChanged()
+    }
+
+    /** The simplifier's panel: floats over the canvas without blocking it, so each change shows live.
+     *  Presets on top (tap: apply, long-press: delete, +: save the current settings), then the three sliders. */
+    private fun renderSimpPanel() {
+        var p = Simp.parse(Prefs.simp) ?: DEFAULT_SIMPS[1]
+        fun set(n: Simp) { p = n; Prefs.simp = n.toString(); board.simpChanged() }
+        simpPanel.removeAllViews()
+        val list = simpPresets()
+        val chips = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        list.forEachIndexed { i, (name, v) ->
+            chips.addView(TextView(this).apply {
+                text = name; setTextColor(chipFg); textSize = 13f; maxLines = 1
+                setPadding(px(12), px(6), px(12), px(6))
+                background = GradientDrawable().apply { cornerRadius = 14 * dp; setColor(if (v == p) Palette.BLUE and 0x55FFFFFF else 0); setStroke(px(1), chipLine) }
+                layoutParams = LinearLayout.LayoutParams(-2, -2).apply { setMargins(px(3), 0, px(3), 0) }
+                setOnClickListener { set(v); renderSimpPanel() }
+                setOnLongClickListener {
+                    AlertDialog.Builder(this@MainActivity).setTitle(name).setPositiveButton(R.string.delete) { _, _ ->
+                        saveSimpPresets(list.filterIndexed { j, _ -> j != i }); renderSimpPanel()
+                    }.setNegativeButton(R.string.cancel, null).show(); true
+                }
+            })
         }
-        showChips()
-        box.addView(HorizontalScrollView(this).apply { setPadding(32, 0, 32, 0); addView(chips) })
+        fun small(icon: Int, desc: String, f: () -> Unit) = ImageView(this).apply {
+            setImageDrawable(ic(icon)); scaleType = ImageView.ScaleType.CENTER; tip(this, desc); setOnClickListener { f() }
+            layoutParams = LinearLayout.LayoutParams(px(36), px(36))
+        }
+        simpPanel.addView(LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(HorizontalScrollView(this@MainActivity).apply { isHorizontalScrollBarEnabled = false; addView(chips) }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(small(R.drawable.ic_plus, s(R.string.save_preset)) {
+                editText(s(R.string.save_preset), "") { n -> saveSimpPresets(simpPresets() + (n.replace('|', ' ').replace('\n', ' ').trim() to p)); renderSimpPanel() }
+            })
+            addView(small(R.drawable.ic_x, s(R.string.close)) { simpPanel.visibility = View.GONE })
+        })
         fun slider(label: Int, range: IntRange, get: (Simp) -> Int, put: (Simp, Int) -> Simp, off: Int) {
-            val t = TextView(this).apply { setPadding(48, 16, 48, 0) }
+            val t = TextView(this).apply { setTextColor(chipFg); textSize = 13f; setPadding(px(12), px(4), px(12), 0) }
             fun show(v: Int) { t.text = "${s(label)} : ${if (v <= off) s(R.string.off) else v}" }
-            val sb = SeekBar(this).apply {
-                max = range.last - range.first; setPadding(48, 24, 48, 24)
+            show(get(p))
+            simpPanel.addView(t)
+            simpPanel.addView(SeekBar(this).apply {
+                max = range.last - range.first; progress = get(p) - range.first
                 setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                    override fun onProgressChanged(sb: SeekBar, v: Int, user: Boolean) { show(v + range.first); if (user) set(put(p, v + range.first)) }
+                    override fun onProgressChanged(sb: SeekBar, v: Int, user: Boolean) { if (user) { show(v + range.first); set(put(p, v + range.first)) } }
                     override fun onStartTrackingTouch(sb: SeekBar) {}
-                    override fun onStopTrackingTouch(sb: SeekBar) {}
+                    override fun onStopTrackingTouch(sb: SeekBar) { renderSimpPanel() } // re-marks the preset that matches, if any
                 })
-            }
-            refresh += { sb.progress = get(p) - range.first; show(get(p)) }
-            box.addView(t); box.addView(sb)
+            })
         }
         slider(R.string.detail, Simp.DETAIL, { it.detail }, { s, v -> s.copy(detail = v) }, off = -1)
         slider(R.string.flat_shapes, Simp.FLAT, { it.flat }, { s, v -> s.copy(flat = v) }, off = 0)
         slider(R.string.values, Simp.TONES, { it.tones }, { s, v -> s.copy(tones = if (v < 2) 0 else v) }, off = 1)
-        refresh.forEach { it() }
-        AlertDialog.Builder(this).setTitle(R.string.simplify).setView(ScrollView(this).apply { addView(box) })
-            .setPositiveButton(R.string.done) { _, _ -> selectionChanged() }
-            .setNegativeButton(R.string.off) { _, _ -> board.setSimplify(""); selectionChanged() }
-            .setNeutralButton(R.string.save_preset) { _, _ ->
-                editText(s(R.string.save_preset), "") { n -> saveSimpPresets(simpPresets() + (n.replace('|', ' ').replace('\n', ' ').trim() to p)) }
-                selectionChanged()
-            }.show()
     }
 
     private fun selectionWithChildren() = board.withDescendants(board.selection).let { ids -> board.scene.items.filter { it.id in ids } }
@@ -1382,7 +1404,7 @@ class MainActivity : Activity(), BoardView.Host {
         toast(s(R.string.exporting))
         thread {
             val r = runCatching {
-                val bmp = renderItems(items, dir, 4096, gray, links)
+                val bmp = renderItems(items, dir, 4096, gray, links, if (Prefs.simpOn) Simp.parse(Prefs.simp) else null)
                 contentResolver.openOutputStream(uri)!!.use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 bmp.recycle()
             }
@@ -1631,7 +1653,7 @@ class MainActivity : Activity(), BoardView.Host {
             Key(KeyEvent.KEYCODE_C, C or A or S, s(R.string.crop)) { if (board.selected().singleOrNull()?.isMedia == true) board.startCrop() },
             Key(KeyEvent.KEYCODE_C, C or S, s(R.string.reset_crop)) { board.resetCrop() },
             Key(KeyEvent.KEYCODE_G, A, s(R.string.gray)) { val g = board.selected().all { it.gray }; board.edit { it.copy(gray = !g) } },
-            Key(KeyEvent.KEYCODE_Q, A, s(R.string.simplify)) { simplifyDialog() },
+            Key(KeyEvent.KEYCODE_Q, A, s(R.string.simplify)) { setSimp(!Prefs.simpOn) },
             Key(KeyEvent.KEYCODE_T, A, s(R.string.pixelated)) { val px = board.selected().filter { it.isMedia }.all { it.nearest }; board.edit { if (it.isMedia) it.copy(nearest = !px) else it } },
             Key(KeyEvent.KEYCODE_L, A, s(R.string.lock)) { board.toggleLock() },
         )

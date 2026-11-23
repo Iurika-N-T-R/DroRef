@@ -46,6 +46,8 @@ object Prefs {
     var container by bool("container", false)     // a frame around everything on the board
     var hexHash by bool("hexHash", true)          // color picker copies "#RRGGBB" (off: "RRGGBB")
     var normalizeFirst by bool("normalizeFirst", false)
+    var simpOn by bool("simpOn", false)           // reference simplifier on the whole canvas
+    var simp by str("simp", "96,3,4")             // its current settings, see Simp
     var simpPresets by str("simpPresets", "")     // simplifier presets, "name|detail,flat,tones" per line; "" = built-in ones
 
     // settings screen (defaults follow PureRef's)
