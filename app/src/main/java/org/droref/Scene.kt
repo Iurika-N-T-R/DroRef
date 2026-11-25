@@ -27,6 +27,8 @@ class Scene private constructor(val dir: File) {
     val links = mutableListOf<Link>() // arrows between items (nodes)
     var lockVisuals = false // "Verrouillage": images, videos and drawings can't be selected or moved
     var lockNodes = false   // notes, nodes and links can't be selected or moved
+    var changedAt = 0L      // when the content (not the camera) last changed: LAN sync's "newer"
+    private var savedContent: String? = null
     val cam = Matrix() // board -> screen
     val images = File(dir, "images").apply { mkdirs() }
     private var nextId = 1L
@@ -57,13 +59,18 @@ class Scene private constructor(val dir: File) {
         return true
     }
 
+    /** What the board holds, without the camera and the .pur path (per device): what LAN sync compares. */
+    fun content(): JSONObject = JSONObject().put("name", name).put("nextId", nextId).put("folder", folder)
+        .put("items", JSONArray(items.map { it.toJson() }))
+        .put("links", JSONArray(links.map { it.toJson() }))
+        .put("lockVisuals", lockVisuals).put("lockNodes", lockNodes)
+
     fun save() {
         val v = FloatArray(9).also(cam::getValues)
-        val o = JSONObject().put("name", name).put("nextId", nextId).put("purUri", purUri).put("folder", folder)
-            .put("camera", JSONArray(v.map { it.toDouble() }))
-            .put("items", JSONArray(items.map { it.toJson() }))
-            .put("links", JSONArray(links.map { it.toJson() }))
-            .put("lockVisuals", lockVisuals).put("lockNodes", lockNodes)
+        val c = content()
+        val text = c.toString()
+        if (text != savedContent) { savedContent = text; changedAt = System.currentTimeMillis() }
+        val o = c.put("purUri", purUri).put("camera", JSONArray(v.map { it.toDouble() })).put("changedAt", changedAt)
         val out = json.startWrite()
         try {
             out.write(o.toString().toByteArray())
@@ -109,6 +116,8 @@ class Scene private constructor(val dir: File) {
         o.optJSONArray("links")?.let { l -> for (i in 0 until l.length()) runCatching { links += Link.fromJson(l.getJSONObject(i)) } }
         lockVisuals = o.optBoolean("lockVisuals")
         lockNodes = o.optBoolean("lockNodes")
+        changedAt = o.optLong("changedAt", json.baseFile.lastModified())
+        savedContent = content().toString()
         if (clean) {
             // images deleted in an earlier session (undo history is gone, so nothing can bring them back)
             val used = items.map { it.file }.toSet()

@@ -307,4 +307,25 @@
     <string name="center_cross">Croix centrale</string>
     <string name="container">Cadre autour du contenu</string>
     <string name="hex_hash">Ajouter # au code hex</string>
+    <string name="lan_sync">Synchro LAN</string>
+    <string name="lan_intro">Synchronisez vos scènes avec DroRef sur vos autres appareils, uniquement via votre Wi-Fi. Affichez un code sur un appareil et tapez-le sur l’autre.</string>
+    <string name="lan_show_code">Afficher un code</string>
+    <string name="lan_enter_code">Saisir un code</string>
+    <string name="lan_code_title">Code d’appairage</string>
+    <string name="lan_code_msg">Tapez ce code sur l’autre appareil, sur le même Wi-Fi. Valable 5 minutes.</string>
+    <string name="lan_looking">Recherche de l’appareil…</string>
+    <string name="lan_paired_toast">Appareils appairés</string>
+    <string name="lan_not_found">Aucun appareil de ce Wi-Fi n’affiche ce code</string>
+    <string name="lan_status">Appairé. Dernière synchro : %1$s.
+Gardez DroRef ouvert sur l’autre appareil pendant la synchro.</string>
+    <string name="lan_never">jamais</string>
+    <string name="lan_sync_now">Synchroniser</string>
+    <string name="lan_add_device">Appairer un autre appareil</string>
+    <string name="lan_unpair">Désappairer cet appareil</string>
+    <string name="lan_syncing">Synchronisation…</string>
+    <string name="lan_syncing_msg">Échange des scènes et de leurs images. Gardez les deux appareils sur le même Wi-Fi.</string>
+    <string name="lan_done">Synchronisé avec %1$d appareil(s) : %2$d reçues, %3$d envoyées</string>
+    <string name="lan_none">Aucun appareil appairé trouvé. Ouvrez DroRef sur l’autre appareil, sur le même Wi-Fi.</string>
+    <string name="lan_busy">L’autre appareil synchronise déjà, réessayez dans un instant</string>
+    <string name="lan_conflict">%1$s (conflit)</string>
 </resources>

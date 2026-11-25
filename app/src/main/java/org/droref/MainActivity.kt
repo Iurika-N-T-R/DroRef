@@ -8,6 +8,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
+import android.app.Dialog
+import android.text.format.DateUtils
 import android.graphics.drawable.ColorDrawable
 import android.widget.PopupWindow
 import android.widget.ScrollView
@@ -126,6 +128,9 @@ class MainActivity : Activity(), BoardView.Host {
         super.onCreate(state)
         val scene = Scene.current(this, s(R.string.untitled))
         board = BoardView(this, scene).apply { host = this@MainActivity }
+        Lan.onSave = { board.scene.save() }
+        Lan.onChanged = ::lanChanged
+        Lan.start(this)
         info = TextView(this).apply {
             visibility = View.GONE
             background = GradientDrawable().apply { cornerRadius = 12 * dp; setColor(0xE6000000.toInt()) }
@@ -262,6 +267,11 @@ class MainActivity : Activity(), BoardView.Host {
         board.releaseMedia()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        Lan.onSave = null; Lan.onChanged = null; Lan.onPaired = null
+    }
+
     // ---- drag and drop from other apps (gallery, browser, files…)
 
     private fun onDrag(e: DragEvent): Boolean = when (e.action) {
@@ -353,6 +363,7 @@ class MainActivity : Activity(), BoardView.Host {
             Tile(R.drawable.ic_images, s(R.string.export_images)) { exportItems = board.ordered(); exportFiles() },
             Tile(R.drawable.ic_pencil_line, s(R.string.rename)) { editText(s(R.string.scene_name), board.scene.name) { board.scene.name = it; board.scene.save(); title = it; titleView.text = it } },
             Tile(R.drawable.ic_copy, s(R.string.duplicate_scene)) { board.scene.save(); switchTo(board.scene.copy(this, s(R.string.copy_of, board.scene.name))) },
+            Tile(R.drawable.ic_refresh_cw, s(R.string.lan_sync)) { lanSync() },
             Tile(R.drawable.ic_trash, s(R.string.delete_scene), color = Palette.RED) { deleteScene() },
         )),
         Section(s(R.string.view), Palette.PURPLE, listOf(
@@ -1316,8 +1327,76 @@ class MainActivity : Activity(), BoardView.Host {
                     switchTo(next)
                 }
                 d.deleteRecursively()
+                Lan.deleted(this, d.name)
                 browser?.refresh()
             }))
+    }
+
+    // ---- LAN sync (Lan.kt): manual, scenes only
+
+    private fun lanSync() {
+        if (Lan.key(this) == null) {
+            ui.card(s(R.string.lan_sync), s(R.string.lan_intro), buttons = listOf(
+                Ui.Btn(s(R.string.lan_enter_code)) { lanEnterCode() },
+                Ui.Btn(s(R.string.lan_show_code), primary = true) { lanShowCode() },
+            ))
+            return
+        }
+        val t = Lan.lastSync(this)
+        val seen = if (t == 0L) s(R.string.lan_never) else DateUtils.getRelativeTimeSpanString(t, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
+        lateinit var dlg: Dialog
+        val lines = ui.lines(listOf(
+            Ui.Line(s(R.string.lan_add_device), ui.ic(R.drawable.ic_plus)),
+            Ui.Line(s(R.string.lan_unpair), ui.ic(R.drawable.ic_unlink, Palette.RED)),
+        ), { i -> dlg.dismiss(); if (i == 0) lanShowCode() else Lan.unpair(this) })
+        dlg = ui.card(s(R.string.lan_sync), s(R.string.lan_status, seen), body = lines, buttons = listOf(
+            Ui.Btn(s(R.string.close)),
+            Ui.Btn(s(R.string.lan_sync_now), primary = true) { lanSyncNow() },
+        ))
+    }
+
+    private fun lanShowCode() {
+        val v = TextView(this).apply {
+            text = Lan.newCode(this@MainActivity).chunked(3).joinToString(" ")
+            textSize = 40f; typeface = Typeface.MONOSPACE; gravity = Gravity.CENTER; setTextColor(ui.fg)
+            setPadding(0, px(8), 0, px(16))
+        }
+        val dlg = ui.card(s(R.string.lan_code_title), s(R.string.lan_code_msg), body = v, buttons = listOf(Ui.Btn(s(R.string.close))))
+        Lan.onPaired = { dlg.dismiss(); toast(s(R.string.lan_paired_toast)) }
+    }
+
+    private fun lanEnterCode() = editText(s(R.string.lan_enter_code), "") { c ->
+        val wait = ui.card(s(R.string.lan_looking)).apply { setCancelable(false) }
+        thread {
+            val ok = Lan.pair(this, c.filter(Char::isDigit))
+            runOnUiThread { wait.dismiss(); if (ok) { toast(s(R.string.lan_paired_toast)); lanSync() } else toast(s(R.string.lan_not_found)) }
+        }
+    }
+
+    private fun lanSyncNow() {
+        board.scene.save()
+        val wait = ui.card(s(R.string.lan_syncing), s(R.string.lan_syncing_msg)).apply { setCancelable(false) }
+        thread {
+            val r = runCatching { Lan.sync(this) }.getOrNull()
+            runOnUiThread {
+                wait.dismiss()
+                when {
+                    r == null || (r.devices == 0 && !r.busy) -> ui.toast(s(R.string.lan_none), long = true)
+                    r.busy -> toast(s(R.string.lan_busy))
+                    else -> ui.toast(s(R.string.lan_done, r.devices, r.got, r.sent), long = true)
+                }
+            }
+        }
+    }
+
+    /** A sync replaced or deleted a scene folder: reload it if it's the one on screen (without saving the stale copy over it). */
+    private fun lanChanged(d: File) {
+        browser?.refresh()
+        if (d != board.scene.dir) return
+        val sc = if (File(d, "scene.json").exists()) Scene.open(d)
+        else Scene.list(this).firstOrNull()?.let(Scene::open) ?: Scene.create(this, s(R.string.untitled))
+        board.setScene(sc)
+        remember(sc)
     }
 
     private fun openPur() = startActivityForResult(

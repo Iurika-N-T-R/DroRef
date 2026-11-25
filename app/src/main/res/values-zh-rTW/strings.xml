@@ -307,4 +307,25 @@
     <string name="center_cross">中心十字</string>
     <string name="container">內容邊框</string>
     <string name="hex_hash">十六進位色碼加 #</string>
+    <string name="lan_sync">區域網路同步</string>
+    <string name="lan_intro">僅透過你自己的 Wi-Fi，與其他裝置上的 DroRef 同步場景。在一台裝置上顯示代碼，在另一台上輸入。</string>
+    <string name="lan_show_code">顯示代碼</string>
+    <string name="lan_enter_code">輸入代碼</string>
+    <string name="lan_code_title">配對代碼</string>
+    <string name="lan_code_msg">請在同一 Wi-Fi 下的另一台裝置上輸入此代碼。5 分鐘內有效。</string>
+    <string name="lan_looking">正在尋找裝置…</string>
+    <string name="lan_paired_toast">裝置已配對</string>
+    <string name="lan_not_found">此 Wi-Fi 上沒有裝置顯示此代碼</string>
+    <string name="lan_status">已配對。上次同步：%1$s
+同步時請在另一台裝置上保持 DroRef 開啟。</string>
+    <string name="lan_never">從未</string>
+    <string name="lan_sync_now">立即同步</string>
+    <string name="lan_add_device">配對另一台裝置</string>
+    <string name="lan_unpair">取消此裝置的配對</string>
+    <string name="lan_syncing">正在同步…</string>
+    <string name="lan_syncing_msg">正在交換場景及其圖片。請讓兩台裝置保持在同一 Wi-Fi 下。</string>
+    <string name="lan_done">已與 %1$d 台裝置同步：收到 %2$d，傳送 %3$d</string>
+    <string name="lan_none">找不到已配對的裝置。請在同一 Wi-Fi 下的另一台裝置上開啟 DroRef。</string>
+    <string name="lan_busy">另一台裝置正在同步，請稍後再試</string>
+    <string name="lan_conflict">%1$s（衝突）</string>
 </resources>

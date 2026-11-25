@@ -1,0 +1,1 @@
+LAN sync: pair your devices once with a 6-digit code, then tap Sync now to exchange your scenes and their images over your own Wi-Fi, encrypted, no cloud. A scene edited on both devices keeps both versions, and deleted scenes are deleted on the other device too.

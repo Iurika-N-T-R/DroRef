@@ -307,4 +307,25 @@
     <string name="center_cross">中心の十字</string>
     <string name="container">内容を囲む枠</string>
     <string name="hex_hash">16進カラーに # を付ける</string>
+    <string name="lan_sync">LAN同期</string>
+    <string name="lan_intro">自分のWi-Fiだけを使って、他のデバイスのDroRefとシーンを同期します。一方のデバイスでコードを表示し、もう一方で入力してください。</string>
+    <string name="lan_show_code">コードを表示</string>
+    <string name="lan_enter_code">コードを入力</string>
+    <string name="lan_code_title">ペアリングコード</string>
+    <string name="lan_code_msg">同じWi-Fiにあるもう一方のデバイスでこのコードを入力してください。有効期限は5分です。</string>
+    <string name="lan_looking">デバイスを検索中…</string>
+    <string name="lan_paired_toast">ペアリングしました</string>
+    <string name="lan_not_found">このWi-Fi上にこのコードを表示しているデバイスはありません</string>
+    <string name="lan_status">ペアリング済み。最終同期：%1$s
+同期中はもう一方のデバイスでDroRefを開いたままにしてください。</string>
+    <string name="lan_never">なし</string>
+    <string name="lan_sync_now">今すぐ同期</string>
+    <string name="lan_add_device">別のデバイスをペアリング</string>
+    <string name="lan_unpair">このデバイスのペアリングを解除</string>
+    <string name="lan_syncing">同期中…</string>
+    <string name="lan_syncing_msg">シーンと画像を交換しています。両方のデバイスを同じWi-Fiに接続したままにしてください。</string>
+    <string name="lan_done">%1$d台のデバイスと同期しました：受信 %2$d、送信 %3$d</string>
+    <string name="lan_none">ペアリング済みのデバイスが見つかりません。同じWi-Fi上のもう一方のデバイスでDroRefを開いてください。</string>
+    <string name="lan_busy">もう一方のデバイスが同期中です。少し待ってから再試行してください</string>
+    <string name="lan_conflict">%1$s（競合）</string>
 </resources>

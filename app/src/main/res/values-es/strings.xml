@@ -307,4 +307,25 @@
     <string name="center_cross">Cruz central</string>
     <string name="container">Marco alrededor del contenido</string>
     <string name="hex_hash">Añadir # al color hex</string>
+    <string name="lan_sync">Sincronización LAN</string>
+    <string name="lan_intro">Sincroniza tus escenas con DroRef en tus otros dispositivos, solo a través de tu Wi-Fi. Muestra un código en un dispositivo y escríbelo en el otro.</string>
+    <string name="lan_show_code">Mostrar un código</string>
+    <string name="lan_enter_code">Introducir un código</string>
+    <string name="lan_code_title">Código de vinculación</string>
+    <string name="lan_code_msg">Escribe este código en el otro dispositivo, en la misma Wi-Fi. Válido durante 5 minutos.</string>
+    <string name="lan_looking">Buscando el dispositivo…</string>
+    <string name="lan_paired_toast">Dispositivos vinculados</string>
+    <string name="lan_not_found">Ningún dispositivo de esta Wi-Fi muestra este código</string>
+    <string name="lan_status">Vinculado. Última sincronización: %1$s.
+Mantén DroRef abierto en el otro dispositivo mientras sincronizas.</string>
+    <string name="lan_never">nunca</string>
+    <string name="lan_sync_now">Sincronizar</string>
+    <string name="lan_add_device">Vincular otro dispositivo</string>
+    <string name="lan_unpair">Desvincular este dispositivo</string>
+    <string name="lan_syncing">Sincronizando…</string>
+    <string name="lan_syncing_msg">Se están intercambiando las escenas y sus imágenes. Mantén ambos dispositivos en la misma Wi-Fi.</string>
+    <string name="lan_done">Sincronizado con %1$d dispositivo(s): %2$d recibidas, %3$d enviadas</string>
+    <string name="lan_none">No se encontró ningún dispositivo vinculado. Abre DroRef en el otro dispositivo, en la misma Wi-Fi.</string>
+    <string name="lan_busy">El otro dispositivo está sincronizando, inténtalo de nuevo en un momento</string>
+    <string name="lan_conflict">%1$s (conflicto)</string>
 </resources>

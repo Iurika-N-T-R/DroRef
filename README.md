@@ -70,6 +70,7 @@ Boards move between the two apps as `.pur` files: *File → Open .pur*, *Save*, 
 | 📥 | **Drag & drop** | From the gallery, browser or files in split screen — and back out |
 | ⌨️ | **Keyboard & mouse** | PureRef's shortcuts, command palette, in-app guide (Ctrl+H) |
 | 🗂️ | **My scenes** | Every board as a preview, in folders |
+| 📶 | **LAN sync** | Sync your scenes between your devices over your own Wi-Fi — no cloud |
 | 🔒 | **Private by design** | No account, no tracking, everything stays on the device |
 
 <details>

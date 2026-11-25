@@ -308,4 +308,25 @@
     <string name="center_cross">Center cross</string>
     <string name="container">Frame around content</string>
     <string name="hex_hash">Add # to hex color</string>
+    <string name="lan_sync">LAN sync</string>
+    <string name="lan_intro">Sync your scenes with DroRef on your other devices, over your own Wi-Fi only. Show a code on one device and type it on the other.</string>
+    <string name="lan_show_code">Show a code</string>
+    <string name="lan_enter_code">Enter a code</string>
+    <string name="lan_code_title">Pairing code</string>
+    <string name="lan_code_msg">Type this code on the other device, on the same Wi-Fi. It works for 5 minutes.</string>
+    <string name="lan_looking">Looking for the device…</string>
+    <string name="lan_paired_toast">Devices paired</string>
+    <string name="lan_not_found">No device on this Wi-Fi is showing this code</string>
+    <string name="lan_status">Paired. Last sync: %1$s.
+Keep DroRef open on the other device while you sync.</string>
+    <string name="lan_never">never</string>
+    <string name="lan_sync_now">Sync now</string>
+    <string name="lan_add_device">Pair another device</string>
+    <string name="lan_unpair">Unpair this device</string>
+    <string name="lan_syncing">Syncing…</string>
+    <string name="lan_syncing_msg">Scenes and their images are being exchanged. Keep both devices on the same Wi-Fi.</string>
+    <string name="lan_done">Synced with %1$d device(s): %2$d received, %3$d sent</string>
+    <string name="lan_none">No paired device found. Open DroRef on the other device, on the same Wi-Fi.</string>
+    <string name="lan_busy">The other device is syncing, try again in a moment</string>
+    <string name="lan_conflict">%1$s (conflict)</string>
 </resources>
