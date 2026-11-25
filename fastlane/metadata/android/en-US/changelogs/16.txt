@@ -1,0 +1,1 @@
+LAN sync now syncs the folders of My scenes too: a folder created, renamed or removed on one device does the same on the other, with no empty leftovers. Fixes a crash during a sync after My scenes had been opened and closed.

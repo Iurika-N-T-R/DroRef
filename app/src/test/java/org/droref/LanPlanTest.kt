@@ -29,4 +29,14 @@ class LanPlanTest {
         assertEquals(listOf("push:s"), plan(m("s" to SyncMeta("h2", "h", 300)), m(del = mapOf("s" to 200L))))
         assertEquals(listOf("delRemote:s"), plan(m(del = mapOf("s" to 200L)), m("s" to SyncMeta("h", "h", 100))))
     }
+
+    @Test fun foldersMergeAgainstTheLastSync() {
+        val base = listOf("Persos", "Décors")
+        // renamed on mine (Persos → Characters), deleted on theirs (Décors), a new one on theirs (Props)
+        assertEquals(listOf("Characters", "Props"), mergeFolders(base, listOf("Characters", "Décors"), listOf("Persos", "Props")))
+        // nothing changed on theirs: mine's rename and delete go through, no empty leftovers
+        assertEquals(listOf("Characters"), mergeFolders(base, listOf("Characters"), base))
+        // first sync (no base): everything from both sides
+        assertEquals(listOf("A", "B"), mergeFolders(emptyList(), listOf("A"), listOf("B", "A")))
+    }
 }

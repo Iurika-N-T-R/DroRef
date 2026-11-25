@@ -35,8 +35,17 @@ class SyncMeta(val h: String, val b: String, val t: Long, val imgs: List<String>
     val changed get() = h != b
 }
 
-/** Every scene of a device, plus the ones it deleted (id → when). */
-class SyncMan(val scenes: Map<String, SyncMeta>, val del: Map<String, Long>)
+/** Every scene of a device, plus the ones it deleted (id → when), plus its folder list (My scenes). */
+class SyncMan(val scenes: Map<String, SyncMeta>, val del: Map<String, Long>, val folders: List<String> = emptyList())
+
+/**
+ * Folder lists of both devices against the list both had at the last sync: a folder added on either side is kept,
+ * one removed on either side goes (a rename is both). Order: mine first, then theirs.
+ */
+fun mergeFolders(base: List<String>, mine: List<String>, theirs: List<String>): List<String> {
+    val gone = (base - mine.toSet()) + (base - theirs.toSet())
+    return (mine + theirs).filter { it.isNotEmpty() && it !in gone }.distinct()
+}
 
 class SyncAct(val op: String, val id: String, val t: Long = 0)
 
@@ -176,11 +185,23 @@ object Lan {
     private fun manifest(ctx: Context) = SyncMan(
         Scene.list(ctx).filter { ID.matches(it.name) }.associate { it.name to meta(it) },
         tombs(ctx),
+        folders(),
     )
+
+    private fun folders() = Prefs.folders.lines().filter { it.isNotEmpty() }
+    private fun folderBase(ctx: Context) = sp(ctx).getString("fbase", "")!!.lines().filter { it.isNotEmpty() }
+
+    /** The merged folder list becomes both the list and the base for the next merge. */
+    private fun setFolders(ctx: Context, list: List<String>) {
+        val text = list.joinToString("\n")
+        sp(ctx).edit().putString("fbase", text).apply()
+        if (text != Prefs.folders) onMain { Prefs.folders = text; onChanged?.invoke(Scene.root(ctx)) } // root ≠ a scene: just refreshes My scenes
+    }
 
     private fun SyncMan.json() = JSONObject()
         .put("scenes", JSONObject().apply { scenes.forEach { (id, m) -> put(id, JSONObject().put("h", m.h).put("b", m.b).put("t", m.t).put("i", JSONArray(m.imgs))) } })
         .put("del", JSONObject(del))
+        .put("folders", JSONArray(folders))
 
     private fun man(o: JSONObject): SyncMan {
         val s = o.getJSONObject("scenes")
@@ -191,6 +212,7 @@ object Lan {
                 SyncMeta(m.getString("h"), m.getString("b"), m.getLong("t"), List(i.length()) { i.getString(it) })
             },
             d.keys().asSequence().associateWith { d.getLong(it) },
+            o.optJSONArray("folders")?.let { f -> List(f.length()) { f.getString(it) } }.orEmpty(),
         )
     }
 
@@ -291,6 +313,7 @@ object Lan {
         // one peer at a time: a flood can't pile up threads
         thread(isDaemon = true, name = "lan") {
             while (!sock.isClosed) runCatching { Conn(sock.accept().apply { soTimeout = 15_000 }).use { serve(app, it) } }
+                .onFailure { if (it !is java.io.EOFException) android.util.Log.w("Lan", "serve", it) }
         }
     }
 
@@ -333,7 +356,7 @@ object Lan {
                     "put" -> { recvScene(ctx, c, req); c.send(ok) }
                     "fork" -> { fork(ctx, req.getString("id")); c.send(ok) }
                     "del" -> { delete(ctx, req.getString("id"), req.getLong("t")); c.send(ok) }
-                    "done" -> { settle(ctx, req.getJSONObject("ids")); sp(ctx).edit().putLong("seen", System.currentTimeMillis()).apply(); c.send(ok) }
+                    "done" -> { settle(ctx, req.getJSONObject("ids")); req.optJSONArray("folders")?.let { f -> setFolders(ctx, List(f.length()) { f.getString(it) }) }; sp(ctx).edit().putLong("seen", System.currentTimeMillis()).apply(); c.send(ok) }
                     else -> return
                 }
             }
@@ -386,8 +409,10 @@ object Lan {
                         val acts = planSync(mine, theirs)
                         if (acts.isEmpty()) {
                             val ids = JSONObject().apply { mine.scenes.forEach { (id, m) -> if (theirs.scenes[id]?.h == m.h) put(id, m.h) } }
-                            c.call(JSONObject().put("op", "done").put("ids", ids))
+                            val folders = mergeFolders(folderBase(ctx), mine.folders, theirs.folders)
+                            c.call(JSONObject().put("op", "done").put("ids", ids).put("folders", JSONArray(folders)))
                             settle(ctx, ids)
+                            setFolders(ctx, folders)
                             reached++
                             return@use
                         }
@@ -404,7 +429,7 @@ object Lan {
                         }
                     }
                 }
-            }
+            }.onFailure { android.util.Log.w("Lan", "sync with $ip", it) }
             if (reached > 0) sp(ctx).edit().putLong("seen", System.currentTimeMillis()).apply()
             return Report(reached, got, sent, busy && reached == 0)
         } finally { lock.unlock() }

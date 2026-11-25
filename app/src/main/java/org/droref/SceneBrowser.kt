@@ -54,6 +54,7 @@ class SceneBrowser(
     private var entries = emptyList<Entry>()
     private val thumbs = HashMap<String, Bitmap?>()
     private val loader = Executors.newSingleThreadExecutor()
+    private var closed = false
     private val main = Handler(Looper.getMainLooper())
 
     private fun ic(id: Int, color: Int = fg) = a.getDrawable(id)!!.mutate().apply { setTint(color) }
@@ -110,7 +111,7 @@ class SceneBrowser(
         dlg.setOnKeyListener { _, code, e ->
             if (code == android.view.KeyEvent.KEYCODE_BACK && e.action == android.view.KeyEvent.ACTION_UP && folder.isNotEmpty()) { folder = ""; refresh(); true } else false
         }
-        dlg.setOnDismissListener { loader.shutdownNow() }
+        dlg.setOnDismissListener { closed = true; loader.shutdownNow() }
         refresh()
         dlg.show()
     }
@@ -119,6 +120,7 @@ class SceneBrowser(
 
     /** Re-reads the scenes; previews that are older than their scene get redrawn in the background. */
     fun refresh() {
+        if (closed) return // closed: its loader is shut down (a LAN sync or a delete can still call this)
         val cur = current()
         val scenes = Scene.list(a).map { d -> if (d == cur.dir) cur else Scene.peek(d) }
         val folders = (Prefs.folders.lines() + scenes.map { it.folder }).filter { it.isNotEmpty() }.distinct().sortedBy { it.lowercase() }
