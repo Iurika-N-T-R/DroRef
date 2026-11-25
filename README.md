@@ -43,7 +43,7 @@ without a PC and without losing the boards they already made in [PureRef](https:
 It is free, open source, works offline and contains no ads or trackers.
 
 Boards move between the two apps as `.pur` files: *File → Open .pur*, *Save*, *Save as .pur*
-(from PureRef 2, save with *Save as → Legacy PureRef scene* first).
+(PureRef 2's native format, with groups, drawings, notes and original image files; legacy 1.x files open too).
 
 > DroRef is an independent app written from scratch and is not affiliated with PureRef or Idyllic Pixel.
 > **On PC, use the original: https://www.pureref.com** · 🌐 Website: https://iurika-n-t-r.github.io/DroRef/

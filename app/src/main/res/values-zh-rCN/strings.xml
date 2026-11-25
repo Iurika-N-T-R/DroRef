@@ -186,7 +186,7 @@
     <string name="downloading">正在下载…</string>
     <string name="exporting">正在导出…</string>
     <string name="saved">已保存</string>
-    <string name="saved_flattened">已保存。在 .pur 中，绘图保存为图片，视频保存为静帧，编组被拆开。</string>
+    <string name="saved_flattened">已保存。在 .pur 中，视频保存为静帧。</string>
     <string name="save_failed">保存失败：%1$s</string>
     <string name="exported">已导出</string>
     <string name="export_failed">导出失败：%1$s</string>

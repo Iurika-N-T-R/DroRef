@@ -187,7 +187,7 @@
     <string name="downloading">Downloading…</string>
     <string name="exporting">Exporting…</string>
     <string name="saved">Saved</string>
-    <string name="saved_flattened">Saved. In the .pur, drawings are images, videos are still frames, and groups are flattened.</string>
+    <string name="saved_flattened">Saved. In the .pur, videos are still frames.</string>
     <string name="save_failed">Save failed: %1$s</string>
     <string name="exported">Exported</string>
     <string name="export_failed">Export failed: %1$s</string>

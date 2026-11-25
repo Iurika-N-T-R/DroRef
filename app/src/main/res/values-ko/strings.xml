@@ -186,7 +186,7 @@
     <string name="downloading">다운로드 중…</string>
     <string name="exporting">내보내는 중…</string>
     <string name="saved">저장됨</string>
-    <string name="saved_flattened">저장됨. .pur에서는 그림은 이미지, 동영상은 정지 화면이 되고 그룹은 해제됩니다.</string>
+    <string name="saved_flattened">저장됨. .pur에서는 동영상이 정지 화면이 됩니다.</string>
     <string name="save_failed">저장 실패: %1$s</string>
     <string name="exported">내보냄</string>
     <string name="export_failed">내보내기 실패: %1$s</string>

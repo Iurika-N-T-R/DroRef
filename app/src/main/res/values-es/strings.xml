@@ -186,7 +186,7 @@
     <string name="downloading">Descargando…</string>
     <string name="exporting">Exportando…</string>
     <string name="saved">Guardado</string>
-    <string name="saved_flattened">Guardado. En el .pur, los dibujos son imágenes, los vídeos un fotograma fijo y los grupos se aplanan.</string>
+    <string name="saved_flattened">Guardado. En el .pur, los vídeos son un fotograma fijo.</string>
     <string name="save_failed">Error al guardar: %1$s</string>
     <string name="exported">Exportado</string>
     <string name="export_failed">Error al exportar: %1$s</string>

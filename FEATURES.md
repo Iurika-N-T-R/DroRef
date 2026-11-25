@@ -55,8 +55,8 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 
 ## Save, open, export
 - ✅ Open .pur (Ctrl+O / Ctrl+L) · ✅ Save (Ctrl+S) writes back to the opened .pur · ✅ Save as .pur (Ctrl+Shift+S)
-- ✅ Legacy format, which PureRef 2.1.3 opens (checked with PureRef's own `exportScene`). Drawings are saved as images, videos as a still, groups flattened.
-- ✅ From PureRef 2: *Save as → Legacy PureRef scene*, then open it here · 🔜 PureRef 2 native format (not public)
+- ✅ Legacy 1.x files still open
+- ✅ PureRef 2 native format, open and save: groups, parenting, vector drawings, notes, comments and original image files are kept; videos go in as a still (format: [pur-2-file-format](https://github.com/Vacyyyy/pur-2-file-format))
 - ✅ My scenes: grid of previews (Ctrl+Alt+L), folders, new / open / rename / duplicate / delete / move to folder, always autosaved, last one reopens · ✅ previous scene (Ctrl+Shift+L)
 - ✅ LAN sync of scenes between your devices (File → LAN sync): pair once with a 6-digit code, then *Sync now*; encrypted, Wi-Fi only, no cloud; folders sync too (created, renamed, removed); a scene edited on both sides keeps both versions
 - ✅ Export scene or selection as PNG · ✅ export images as files: originals when uncropped, cropped ones as PNG or JPG
