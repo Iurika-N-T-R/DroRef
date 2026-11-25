@@ -1,7 +1,6 @@
 package org.droref
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -44,14 +43,11 @@ import android.view.WindowManager
 import android.view.inputmethod.BaseInputConnection
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.ArrayAdapter
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.graphics.drawable.GradientDrawable
-import android.widget.SeekBar
 import android.widget.TextView
-import android.widget.Toast
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -68,6 +64,7 @@ private const val REQ_IMAGES = 6
 private const val REQ_SETTINGS_OUT = 7
 private const val REQ_SETTINGS_IN = 8
 private const val CLIP_LABEL = "droref-items"
+private val GRID_SIZES = listOf(10, 20, 25, 50, 100, 200)
 
 class MainActivity : Activity(), BoardView.Host {
     private lateinit var board: BoardView
@@ -97,6 +94,7 @@ class MainActivity : Activity(), BoardView.Host {
     private val light get() = Prefs.theme == 1
     private val dp by lazy { resources.displayMetrics.density }
     private fun px(v: Int) = (v * dp).toInt()
+    private val ui by lazy { Ui(this) }
     private val chipBg get() = if (light) 0xF2FFFFFF.toInt() else 0xF2404040.toInt() // stands out from the canvas
     private val chipLine get() = if (light) 0x22000000 else 0x33FFFFFF
     private val chipFg get() = if (light) 0xFF222222.toInt() else 0xFFFFFFFF.toInt()
@@ -362,6 +360,9 @@ class MainActivity : Activity(), BoardView.Host {
             Tile(R.drawable.ic_grid_3x3, s(R.string.grid_lines), Prefs.grid == 1) { Prefs.grid = 1; board.invalidate() },
             Tile(R.drawable.ic_square, s(R.string.grid_none), Prefs.grid == 0) { Prefs.grid = 0; board.invalidate() },
             Tile(R.drawable.ic_magnet, s(R.string.snap), Prefs.snap) { Prefs.snap = !Prefs.snap },
+            Tile(R.drawable.ic_ruler, "${s(R.string.grid_size)} · ${Prefs.gridSize}") {
+                choose(s(R.string.grid_size), GRID_SIZES.map { "$it" }, checked = GRID_SIZES.indexOf(Prefs.gridSize)) { Prefs.gridSize = GRID_SIZES[it]; board.invalidate() }
+            },
             Tile(R.drawable.ic_lock, s(R.string.lock_canvas), Prefs.canvasLocked) { toggleCanvasLock() },
             Tile(R.drawable.ic_contrast, s(R.string.grayscale_canvas), Prefs.canvasGray) { Prefs.canvasGray = !Prefs.canvasGray; board.invalidate() },
             Tile(R.drawable.ic_plus, s(R.string.center_cross), Prefs.centerCross) { Prefs.centerCross = !Prefs.centerCross; board.invalidate() },
@@ -873,21 +874,19 @@ class MainActivity : Activity(), BoardView.Host {
             val t = TextView(this).apply { setTextColor(chipFg); textSize = 13f }
             fun show() { t.text = "${s(labels.getValue(st.k))} : ${st.v}"; t.alpha = if (st.on) 1f else 0.45f }
             show()
-            val sb = SeekBar(this).apply {
-                max = range.last - range.first; progress = st.v - range.first; isEnabled = st.on; alpha = if (st.on) 1f else 0.45f
-                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                    override fun onProgressChanged(sb: SeekBar, v: Int, user: Boolean) { if (user) { st = st.copy(v = v + range.first); show(); set(p.with(st)) } }
-                    override fun onStartTrackingTouch(sb: SeekBar) {}
-                    override fun onStopTrackingTouch(sb: SeekBar) { renderSimpPanel() } // re-marks the preset that matches, if any
-                })
-            }
+            val span = (range.last - range.first).toFloat()
+            // snaps to whole steps; letting go re-marks the preset that matches, if any
+            val sb = ui.slider((st.v - range.first) / span, onRelease = ::renderSimpPanel) { f ->
+                val v = range.first + (f * span).roundToInt()
+                if (v != st.v) { st = st.copy(v = v); show(); set(p.with(st)) }
+            }.apply { isEnabled = st.on; alpha = if (st.on) 1f else 0.45f; contentDescription = s(labels.getValue(st.k)) }
             simpPanel.addView(LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 addView(small(if (st.on) R.drawable.ic_eye else R.drawable.ic_eye_off, s(labels.getValue(st.k))) { set(p.with(st.copy(on = !st.on))); renderSimpPanel() })
                 addView(t, LinearLayout.LayoutParams(0, -2, 1f))
                 if (i >= 2) addView(small(R.drawable.ic_chevron_left, s(R.string.move_up)) { set(p.up(st.k)); renderSimpPanel() }.apply { rotation = 90f })
             })
-            simpPanel.addView(sb)
+            simpPanel.addView(sb, LinearLayout.LayoutParams(-1, px(36)).apply { setMargins(px(8), 0, px(8), 0) })
         }
     }
 
@@ -916,18 +915,14 @@ class MainActivity : Activity(), BoardView.Host {
 
     /** Rich-text note editor: bold, italic, underline, strike, size, color, highlight, font, alignment, bullets, checklists, links. */
     private fun noteEditor(item: Item?, node: Boolean = item?.node == true) {
-        val et = EditText(this).apply {
-            setText(Rich.build(item?.text ?: "", item?.spans ?: ""), TextView.BufferType.SPANNABLE)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            minLines = 3
-            gravity = Gravity.TOP or Gravity.START
+        val et = ui.field(Rich.build(item?.text ?: "", item?.spans ?: ""), multiline = true).apply {
             // a node just dropped at the end of a link still has its placeholder name: typing replaces it
             if (item?.node == true && item.text == s(R.string.node)) selectAll() else setSelection(text.length)
         }
         // icon buttons on a few rows that wrap to the dialog width, no sideways scrolling
         val tools = GridLayout(this).apply { columnCount = 7 }
         fun tool(iconId: Int, desc: Int, f: (Editable, Int, Int) -> Unit) = tools.addView(ImageView(this).apply {
-            setImageDrawable(ic(iconId, textColor))
+            setImageDrawable(ic(iconId))
             scaleType = ImageView.ScaleType.CENTER
             tip(this, s(desc))
             background = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackgroundBorderless)).run { getDrawable(0).also { recycle() } }
@@ -957,20 +952,19 @@ class MainActivity : Activity(), BoardView.Host {
         tool(R.drawable.ic_list_indent_decrease, R.string.indent_less) { e, a, b -> indent(e, a, b, -1) }
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(px(12), 0, px(12), 0)
+            setPadding(px(16), 0, px(16), px(4))
             addView(tools, LinearLayout.LayoutParams(-1, -2))
-            addView(et)
+            addView(et, LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(6) })
         }
-        AlertDialog.Builder(this).setTitle(if (item == null) (if (node) R.string.add_node else R.string.add_note) else if (node) R.string.node else R.string.note).setView(layout)
-            .setPositiveButton(R.string.ok) { _, _ ->
+        ui.card(s(if (item == null) (if (node) R.string.add_node else R.string.add_note) else if (node) R.string.node else R.string.note), body = layout, keyboard = true,
+            buttons = listOf(Ui.Btn(s(R.string.cancel)), Ui.Btn(s(R.string.ok), primary = true) {
                 BaseInputConnection.removeComposingSpans(et.text) // the keyboard's underline under the word being typed
                 val text = et.text.toString()
-                if (text.isBlank()) return@setPositiveButton
-                val spans = Rich.toJson(et.text)
-                if (item == null) board.addNote(text, spans, node = node) else board.editNote(item.id, text, spans)
-            }
-            .setNegativeButton(R.string.cancel, null).show()
-            .window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+                if (text.isNotBlank()) {
+                    val spans = Rich.toJson(et.text)
+                    if (item == null) board.addNote(text, spans, node = node) else board.editNote(item.id, text, spans)
+                }
+            }))
         et.requestFocus()
     }
 
@@ -1077,45 +1071,36 @@ class MainActivity : Activity(), BoardView.Host {
         sheet(s(R.string.speed), listOf(Section(s(R.string.speed), Palette.BLUE, v.map { x -> Tile(R.drawable.ic_gauge, "$x×") { f(x) } })), light)
     }
 
-    private fun seekBar(start: Float, f: (Float) -> Unit) = SeekBar(this).apply {
-        max = 1000
-        progress = (start * 1000).toInt()
-        setPadding(48, 32, 48, 32)
-        setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar, p: Int, user: Boolean) { if (user) f(p / 1000f) }
-            override fun onStartTrackingTouch(sb: SeekBar) {}
-            override fun onStopTrackingTouch(sb: SeekBar) {}
-        })
-    }
-
     private fun scrub(start: Float, f: (Float) -> Unit) {
-        AlertDialog.Builder(this).setTitle(R.string.scrub).setView(seekBar(start, f)).setPositiveButton(R.string.done) { _, _ -> selectionChanged() }.show()
+        ui.card(s(R.string.scrub), body = ui.padded(ui.slider(start, f = f).apply { minimumHeight = px(40) }), buttons = listOf(Ui.Btn(s(R.string.done), primary = true)),
+            bottom = true, dim = false, onClose = ::selectionChanged)
     }
 
     /** AnimRef-style trimmed loop: drag start and end, the video jumps there so you can see the frame. */
     private fun loopEditor(item: Item, vid: Vid) {
         var a = item.loopA
         var b = item.loopB
+        var ok = false
         vid.playing = false
+        lateinit var sa: Slider
+        lateinit var sb: Slider
+        sa = ui.slider(a) { a = min(it, b - 0.01f); sa.value = a; vid.seek(a) }
+        sb = ui.slider(b) { b = max(it, a + 0.01f); sb.value = b; vid.seek(b) }
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 24, 0, 0)
-            addView(TextView(context).apply { text = s(R.string.loop_start); setPadding(48, 0, 48, 0) })
-            addView(seekBar(a) { a = min(it, b - 0.01f); vid.seek(a) })
-            addView(TextView(context).apply { text = s(R.string.loop_end); setPadding(48, 0, 48, 0) })
-            addView(seekBar(b) { b = max(it, a + 0.01f); vid.seek(b) })
+            addView(ui.labeled(s(R.string.loop_start), sa))
+            addView(ui.labeled(s(R.string.loop_end), sb))
         }
-        AlertDialog.Builder(this).setTitle(R.string.loop).setView(box)
-            .setPositiveButton(R.string.ok) { _, _ -> board.setLoop(item, a, b, true); vid.seek(a); vid.playing = true; selectionChanged() }
-            .setNegativeButton(R.string.cancel) { _, _ -> vid.playing = true }
-            .show()
+        ui.card(s(R.string.loop), body = box, bottom = true, dim = false,
+            buttons = listOf(Ui.Btn(s(R.string.cancel)), Ui.Btn(s(R.string.ok), primary = true) { ok = true; board.setLoop(item, a, b, true); vid.seek(a); selectionChanged() }),
+            onClose = { vid.playing = true; if (!ok) board.invalidate() })
     }
 
     private fun opacity() {
         val start = board.selected().firstOrNull()?.opacity ?: 1f
         board.beginOpacity()
-        AlertDialog.Builder(this).setTitle(R.string.opacity).setView(seekBar(start) { board.setOpacity(it.coerceAtLeast(0.05f)) })
-            .setPositiveButton(R.string.done, null).show()
+        ui.card(s(R.string.opacity), body = ui.padded(ui.slider(start) { board.setOpacity(it.coerceAtLeast(0.05f)) }.apply { minimumHeight = px(40) }),
+            buttons = listOf(Ui.Btn(s(R.string.done), primary = true)), bottom = true, dim = false)
     }
 
     // ---- hierarchy
@@ -1139,11 +1124,9 @@ class MainActivity : Activity(), BoardView.Host {
     private fun hierarchy() {
         val items = board.ordered()
         if (items.isEmpty()) return
-        val dlg = choose(s(R.string.hierarchy), items.map(::label), items.map { ic(typeIcon(it), textColor) },
+        choose(s(R.string.hierarchy), items.map(::label), items.map { ic(typeIcon(it), textColor) },
             ends = items.map { if (it.locked) ic(R.drawable.ic_lock, textColor) else if (it.comment.isNotEmpty()) ic(R.drawable.ic_message_square, textColor) else null },
-            indent = items.map { board.depth(it) }) { i -> board.select(listOf(items[i])); board.focus(listOf(items[i])) }
-        dlg.listView.setOnItemLongClickListener { _, _, i, _ ->
-            dlg.dismiss()
+            indent = items.map { board.depth(it) }, onLong = { i ->
             val it = items[i]
             sheet(label(it), listOf(Section(s(R.string.hierarchy), Palette.PURPLE, listOf(
                 Tile(R.drawable.ic_text_cursor_input, s(R.string.rename)) { editText(s(R.string.name), it.name) { n -> board.rename(it, n) } },
@@ -1157,16 +1140,13 @@ class MainActivity : Activity(), BoardView.Host {
                 Tile(if (it.locked) R.drawable.ic_lock_open else R.drawable.ic_lock, s(if (it.locked) R.string.unlock else R.string.lock)) { board.apply(listOf(it.copy(locked = !it.locked))) },
                 Tile(R.drawable.ic_trash, s(R.string.delete), color = Palette.RED) { board.select(listOf(it)); board.delete() },
             ))), light)
-            true
-        }
+        }) { i -> board.select(listOf(items[i])); board.focus(listOf(items[i])) }
     }
 
     // ---- host callbacks
 
     override fun lockedPressed(item: Item) {
-        AlertDialog.Builder(this).setMessage(R.string.locked_item)
-            .setPositiveButton(R.string.unlock) { _, _ -> board.unlock(item) }
-            .setNegativeButton(R.string.cancel, null).show()
+        ui.card(null, s(R.string.locked_item), buttons = listOf(Ui.Btn(s(R.string.cancel)), Ui.Btn(s(R.string.unlock), primary = true) { board.unlock(item) }))
     }
 
     override fun canvasMenu() {
@@ -1330,16 +1310,14 @@ class MainActivity : Activity(), BoardView.Host {
     }
 
     private fun deleteScene(d: File = board.scene.dir) {
-        AlertDialog.Builder(this).setMessage(s(R.string.delete_scene_q, sceneAt(d).name))
-            .setPositiveButton(R.string.delete) { _, _ ->
+        ui.card(null, s(R.string.delete_scene_q, sceneAt(d).name), buttons = listOf(Ui.Btn(s(R.string.cancel)), Ui.Btn(s(R.string.delete), danger = true) {
                 if (d == board.scene.dir) {
                     val next = Scene.list(this).firstOrNull { it != d }?.let { Scene.open(it) } ?: Scene.create(this, s(R.string.untitled))
                     switchTo(next)
                 }
                 d.deleteRecursively()
                 browser?.refresh()
-            }
-            .setNegativeButton(R.string.cancel, null).show()
+            }))
     }
 
     private fun openPur() = startActivityForResult(
@@ -1368,9 +1346,7 @@ class MainActivity : Activity(), BoardView.Host {
                     if (skipped > 0) toast(s(R.string.skipped_linked, skipped))
                 }.onFailure {
                     sc.dir.deleteRecursively()
-                    AlertDialog.Builder(this).setTitle(R.string.couldnt_open)
-                        .setMessage(if (it is Pur2Exception) s(R.string.pur2) else s(R.string.not_pur))
-                        .setPositiveButton(R.string.ok, null).show()
+                    ui.card(s(R.string.couldnt_open), if (it is Pur2Exception) s(R.string.pur2) else s(R.string.not_pur), buttons = listOf(Ui.Btn(s(R.string.ok), primary = true)))
                 }
             }
         }
@@ -1521,6 +1497,7 @@ class MainActivity : Activity(), BoardView.Host {
             flag(R.drawable.ic_bring_to_front, R.string.bring_front, { Prefs.bringToFront }) { Prefs.bringToFront = it },
             flag(R.drawable.ic_crosshair, R.string.dbl_focus, { Prefs.doubleTapFocus }) { Prefs.doubleTapFocus = it },
             pick(R.drawable.ic_square, R.string.borders, listOf(0, 1, 2), listOf(s(R.string.borders_all), s(R.string.borders_selected), s(R.string.off)), { Prefs.borders }) { Prefs.borders = it },
+            pick(R.drawable.ic_ruler, R.string.grid_size, GRID_SIZES, GRID_SIZES.map { "$it" }, { Prefs.gridSize }) { Prefs.gridSize = it },
             pick(R.drawable.ic_move_horizontal, R.string.padding, listOf(0, 5, 10, 20, 40), listOf("0", "5", "10", "20", "40"), { Prefs.padding }) { Prefs.padding = it },
             pick(R.drawable.ic_grid_2x2, R.string.sampling, listOf(false, true), listOf(s(R.string.smooth), s(R.string.pixelated)), { Prefs.nearest }) { Prefs.nearest = it },
             pick(R.drawable.ic_clock, R.string.slide_interval, listOf(3, 5, 10, 20, 30, 60), listOf(3, 5, 10, 20, 30, 60).map { s(R.string.seconds, it) }, { Prefs.slideSeconds }) { Prefs.slideSeconds = it },
@@ -1549,7 +1526,7 @@ class MainActivity : Activity(), BoardView.Host {
         }
     }
 
-    private fun editSetting(i: Int, o: Opt, reopen: Boolean) = choose(o.label, o.values) { v ->
+    private fun editSetting(i: Int, o: Opt, reopen: Boolean) = choose(o.label, o.values, checked = o.get()) { v ->
         o.set(v)
         if (i <= 1) recreate() else { board.invalidate(); if (reopen) showSettings() } // theme, language need a restart
     }
@@ -1562,30 +1539,27 @@ class MainActivity : Activity(), BoardView.Host {
             listOf(Triple(R.drawable.ic_undo_2, s(R.string.undo), { board.undo() }), Triple(R.drawable.ic_redo_2, s(R.string.redo), { board.redo() })) +
             opts.mapIndexed { i, o -> Triple(o.icon, "${s(R.string.settings)} › ${o.label}", { editSetting(i, o, reopen = false) }) }
         var shown = all
-        val adapter = iconAdapter(ArrayList(all.map { it.second }), { shown[it].first.takeIf { id -> id != 0 }?.let { id -> ic(id, textColor) } })
-        val input = EditText(this).apply { hint = s(R.string.search_hint); isSingleLine = true }
-        val list = android.widget.ListView(this).apply { this.adapter = adapter }
+        lateinit var dlg: android.app.Dialog
+        val input = ui.field(hint = s(R.string.search_hint))
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun refill() = ui.fill(list, shown.map { Ui.Line(it.second, it.first.takeIf { id -> id != 0 }?.let { id -> ic(id) }) }, { i -> dlg.dismiss(); shown[i].third() })
+        refill()
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 16, 32, 0)
-            addView(input)
-            addView(list, LinearLayout.LayoutParams(-1, (resources.displayMetrics.heightPixels * 0.5f).toInt()))
+            addView(ui.padded(input, 16))
+            addView(ScrollView(this@MainActivity).apply { addView(list) }, LinearLayout.LayoutParams(-1, (resources.displayMetrics.heightPixels * 0.5f).toInt()))
         }
-        val dlg = AlertDialog.Builder(this).setTitle(R.string.command_palette).setView(box).create()
         input.addTextChangedListener(object : android.text.TextWatcher {
             override fun afterTextChanged(e: Editable) {
                 val q = e.toString().trim().lowercase()
                 shown = all.filter { it.second.lowercase().contains(q) }
-                adapter.clear()
-                adapter.addAll(shown.map { it.second })
+                refill()
             }
             override fun beforeTextChanged(t: CharSequence, a: Int, b: Int, c: Int) {}
             override fun onTextChanged(t: CharSequence, a: Int, b: Int, c: Int) {}
         })
         input.setOnEditorActionListener { _, _, _ -> shown.firstOrNull()?.let { dlg.dismiss(); it.third() }; true }
-        list.setOnItemClickListener { _, _, i, _ -> dlg.dismiss(); shown[i].third() }
-        dlg.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
-        dlg.show()
+        dlg = ui.card(s(R.string.command_palette), body = box, keyboard = true)
         input.requestFocus()
     }
 
@@ -1714,16 +1688,15 @@ class MainActivity : Activity(), BoardView.Host {
 
     /** How the mouse, touchpad and keys work; Android's own list only shows keys. */
     private fun keyboardGuide() {
-        AlertDialog.Builder(this).setTitle(R.string.guide).setMessage(R.string.guide_text)
-            .setPositiveButton(R.string.all_shortcuts) { _, _ -> requestShowKeyboardShortcuts() }
-            .setNegativeButton(R.string.close, null).show()
+        ui.card(s(R.string.guide), s(R.string.guide_text), buttons = listOf(
+            Ui.Btn(s(R.string.close)), Ui.Btn(s(R.string.all_shortcuts), primary = true) { requestShowKeyboardShortcuts() }))
     }
 
     /** Once, the first time a keyboard is plugged in or the cover is attached. */
     private fun keyboardHint() {
         if (resources.configuration.keyboard != android.content.res.Configuration.KEYBOARD_QWERTY || Prefs.keyboardHinted) return
         Prefs.keyboardHinted = true
-        Toast.makeText(this, s(R.string.keyboard_hint), Toast.LENGTH_LONG).show()
+        ui.toast(s(R.string.keyboard_hint), long = true)
     }
 
     override fun onConfigurationChanged(c: android.content.res.Configuration) {
@@ -1765,38 +1738,17 @@ class MainActivity : Activity(), BoardView.Host {
 
     // ---- small dialogs
 
-    /** List rows with an icon at the start (and optionally one at the end, and an indent level). */
-    private fun iconAdapter(items: MutableList<String>, start: (Int) -> Drawable?, end: (Int) -> Drawable? = { null }, indent: (Int) -> Int = { 0 }) =
-        object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, items) {
-            override fun getView(pos: Int, convert: View?, parent: ViewGroup): View = (super.getView(pos, convert, parent) as TextView).apply {
-                setCompoundDrawablesRelative(start(pos)?.apply { setBounds(0, 0, px(22), px(22)) }, null, end(pos)?.apply { setBounds(0, 0, px(18), px(18)) }, null)
-                compoundDrawablePadding = px(16)
-                setPaddingRelative(px(24 + indent(pos) * 22), paddingTop, px(24), paddingBottom)
-            }
-        }
-
-    /** A list to pick from; with icons when given. Returns the dialog (the hierarchy adds a long-press). */
+    /** A list to pick from, in the app's own card; [checked] marks the current value. */
     private fun choose(title: String, items: List<String>, icons: List<Drawable?>? = null, ends: List<Drawable?>? = null,
-                       indent: List<Int>? = null, f: (Int) -> Unit): AlertDialog {
-        val b = AlertDialog.Builder(this).setTitle(title)
-        if (icons == null) b.setItems(items.toTypedArray()) { _, w -> f(w) }
-        else b.setAdapter(iconAdapter(items.toMutableList(), { icons[it] }, { ends?.get(it) }, { indent?.get(it) ?: 0 })) { _, w -> f(w) }
-        return b.show()
-    }
+                       indent: List<Int>? = null, checked: Int = -1, onLong: ((Int) -> Unit)? = null, f: (Int) -> Unit) =
+        ui.list(title, items.mapIndexed { i, t -> Ui.Line(t, icons?.get(i), ends?.get(i), indent?.get(i) ?: 0, i == checked) }, onLong, f)
 
-    private fun editText(title: String, initial: String, allowEmpty: Boolean = false, f: (String) -> Unit) {
-        val input = EditText(this).apply { setText(initial); setSelection(text.length) }
-        AlertDialog.Builder(this).setTitle(title).setView(input)
-            .setPositiveButton(R.string.ok) { _, _ -> input.text.toString().takeIf { allowEmpty || it.isNotBlank() }?.let(f) }
-            .setNegativeButton(R.string.cancel, null).show()
-            .window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
-        input.requestFocus()
-    }
+    private fun editText(title: String, initial: String, allowEmpty: Boolean = false, f: (String) -> Unit) =
+        ui.ask(title, initial, s(R.string.ok), s(R.string.cancel), allowEmpty, f)
 
     private fun about() {
-        AlertDialog.Builder(this).setTitle(R.string.app_name).setMessage(R.string.about_text)
-            .setPositiveButton(R.string.get_pureref) { _, _ -> open("https://www.pureref.com") }
-            .setNegativeButton(R.string.close, null).show()
+        ui.card(s(R.string.app_name), s(R.string.about_text), buttons = listOf(
+            Ui.Btn(s(R.string.close)), Ui.Btn(s(R.string.get_pureref), primary = true) { open("https://www.pureref.com") }))
     }
 
     private fun open(url: String) = runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
@@ -1807,7 +1759,7 @@ class MainActivity : Activity(), BoardView.Host {
         toast(s(R.string.copied, t))
     }
 
-    private fun toast(t: String) = Toast.makeText(this, t, Toast.LENGTH_SHORT).show()
+    private fun toast(t: String) = ui.toast(t)
 }
 
 // ---- web

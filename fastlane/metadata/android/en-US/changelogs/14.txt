@@ -1,0 +1,1 @@
+Arrange is now a Pinterest-style masonry that keeps every image's size, so portrait and landscape images mix instead of stacking. Adjustable grid size; snap to grid also snaps the size when scaling. Lists, dialogs, text fields, sliders and messages now use DroRef's own style instead of the system one.

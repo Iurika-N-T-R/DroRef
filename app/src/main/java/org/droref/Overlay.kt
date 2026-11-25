@@ -1,7 +1,6 @@
 package org.droref
 
 import android.annotation.SuppressLint
-import android.app.AlertDialog
 import android.app.AppOpsManager
 import android.app.Service
 import android.app.usage.UsageEvents
@@ -22,7 +21,6 @@ import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 
 /**
  * PureRef's "always on top", Android style: the board in a floating window over any app.
@@ -53,6 +51,7 @@ class OverlayService : Service(), BoardView.Host {
         }
     }
     private val dp by lazy { resources.displayMetrics.density }
+    private val ui by lazy { Ui(ContextThemeWrapper(this, android.R.style.Theme_DeviceDefault_Dialog_NoActionBar), type) } // after onCreate sets type
     private val barH by lazy { (40 * dp).toInt() }
 
     override fun attachBaseContext(base: Context) = super.attachBaseContext(base.localized())
@@ -140,7 +139,7 @@ class OverlayService : Service(), BoardView.Host {
 
     private fun pickTarget() {
         if (!hasUsageAccess()) {
-            Toast.makeText(this, R.string.usage_access, Toast.LENGTH_LONG).show()
+            ui.toast(getString(R.string.usage_access), long = true)
             runCatching { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             return
         }
@@ -148,16 +147,14 @@ class OverlayService : Service(), BoardView.Host {
         val apps = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
             .map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
             .filter { it.first != packageName }.distinctBy { it.first }.sortedBy { it.second.lowercase() }
-        val labels = listOf(getString(R.string.pin_everywhere)) + apps.map { (pkg, name) -> if (pkg == Prefs.ovTarget) "📌 $name" else name }
-        AlertDialog.Builder(ContextThemeWrapper(this, android.R.style.Theme_DeviceDefault_Dialog_Alert))
-            .setTitle(R.string.ov_pin)
-            .setItems(labels.toTypedArray()) { _, i ->
-                Prefs.ovTarget = if (i == 0) "" else apps[i - 1].first
-                markPin()
-                setShown(true)
-                if (i > 0) Toast.makeText(this, getString(R.string.pinned_to, apps[i - 1].second), Toast.LENGTH_LONG).show()
-            }
-            .create().apply { window?.setType(type) }.show()
+        val lines = listOf(Ui.Line(getString(R.string.pin_everywhere), checked = Prefs.ovTarget.isEmpty())) +
+            apps.map { (pkg, name) -> Ui.Line(name, checked = pkg == Prefs.ovTarget) }
+        ui.list(getString(R.string.ov_pin), lines) { i ->
+            Prefs.ovTarget = if (i == 0) "" else apps[i - 1].first
+            markPin()
+            setShown(true)
+            if (i > 0) ui.toast(getString(R.string.pinned_to, apps[i - 1].second), long = true)
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -203,7 +200,7 @@ class OverlayService : Service(), BoardView.Host {
         if (on && Build.VERSION.SDK_INT >= 31) boardLp.alpha = minOf(boardLp.alpha, MAX_THROUGH_ALPHA)
         through.setBackgroundColor(if (on) 0xFF4FA3FF.toInt() else 0)
         layout()
-        Toast.makeText(this, if (on) R.string.ov_through_on else R.string.ov_through_off, Toast.LENGTH_SHORT).show()
+        ui.toast(getString(if (on) R.string.ov_through_on else R.string.ov_through_off))
     }
 
     override fun onDestroy() {
@@ -218,7 +215,7 @@ class OverlayService : Service(), BoardView.Host {
 
     // the floating board is for looking and arranging; menus live in the app
     override fun selectionChanged() {}
-    override fun lockedPressed(item: Item) = Toast.makeText(this, R.string.locked_item, Toast.LENGTH_SHORT).show()
+    override fun lockedPressed(item: Item) = ui.toast(getString(R.string.locked_item))
     override fun canvasMenu() {}
     override fun picked(info: String, hex: String) {}
     override fun editItem(item: Item) {}

@@ -7,21 +7,39 @@ import kotlin.math.sqrt
 object Arrange {
     private val PAD get() = Prefs.padding.toFloat()
 
-    /** Rows in the given order, wrapping at a width that makes the block roughly [aspect] (w/h). */
-    fun rows(items: List<Item>, aspect: Float, left: Float, top: Float): List<Item> {
+    /**
+     * Pinterest-style masonry that keeps every size: in the given order, each item rises to the highest free spot
+     * of a skyline (the bottom edge of what is already placed), flush with a neighbour's left or right side.
+     * The block is wrapped at a width that makes it roughly [aspect] (w/h).
+     */
+    // ponytail: O(n³) skyline scan, fine for a few hundred items; segment tree if boards get to thousands
+    fun masonry(items: List<Item>, aspect: Float, left: Float, top: Float): List<Item> {
         if (items.isEmpty()) return items
-        val area = items.sumOf { it.bounds().let { b -> (b.width() * b.height()).toDouble() } }
-        val rowW = max(sqrt(area * aspect).toFloat(), items.maxOf { it.bounds().width() })
-        var x = left
-        var y = top
-        var rowH = 0f
+        val pad = PAD
+        val area = items.sumOf { it.bounds().let { b -> ((b.width() + pad) * (b.height() + pad)).toDouble() } }
+        val width = max(sqrt(area * aspect).toFloat(), items.maxOf { it.bounds().width() + pad })
+        // skyline: x-sorted segments [x0, x1) whose next free y is y
+        var sky = listOf(floatArrayOf(0f, width, 0f))
         return items.map {
             val b = it.bounds()
-            if (x > left && x + b.width() > left + rowW) { x = left; y += rowH + PAD; rowH = 0f }
-            val moved = it.moveBy(x - b.left, y - b.top)
-            x += b.width() + PAD
-            rowH = max(rowH, b.height())
-            moved
+            val w = b.width() + pad
+            fun yAt(x: Float) = sky.filter { s -> s[0] < x + w - 0.01f && s[1] > x + 0.01f }.maxOf { s -> s[2] }
+            val (x, y) = sky.flatMap { s -> listOf(s[0], s[1] - w) }
+                .filter { x -> x >= 0f && x + w <= width + 0.01f }
+                .map { x -> x to yAt(x) }
+                .minWith(compareBy({ p -> p.second }, { p -> p.first }))
+            val x1 = x + w
+            val top2 = y + b.height() + pad
+            sky = (sky.flatMap { s ->
+                when {
+                    s[1] <= x || s[0] >= x1 -> listOf(s)
+                    else -> listOfNotNull(
+                        if (s[0] < x) floatArrayOf(s[0], x, s[2]) else null,
+                        if (s[1] > x1) floatArrayOf(x1, s[1], s[2]) else null,
+                    )
+                }
+            } + listOf(floatArrayOf(x, x1, top2))).sortedBy { s -> s[0] }
+            it.moveBy(left + x - b.left, top + y - b.top)
         }
     }
 

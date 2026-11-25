@@ -50,7 +50,6 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
-const val GRID = 50f
 /** Marks drags that started in DroRef itself, so the board doesn't take its own drops. */
 val DRAG_SELF = Any()
 private const val MIN_ZOOM = 0.005f
@@ -294,6 +293,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     private var pivot = FloatArray(2) // board coords, for Ctrl-drag rotate / Ctrl+Alt-drag scale
     private var turned = 0f
     private var scaled = 1f
+    private var pinched = false // the gesture changed the size: snap the size too
 
     // drawing
     var drawing = false
@@ -601,7 +601,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         val t = targets().ifEmpty { return }
         val r = t.union()
         var order = when (mode) {
-            "optimal" -> t.sortedByDescending { it.bounds().height() }
+            "optimal" -> t.sortedByDescending { it.bounds().height() } // tallest first fills the skyline best
             "name" -> t.sortedBy { it.name.ifEmpty { it.file }.lowercase() }
             "addition" -> t.sortedBy { it.id }
             "path" -> t.sortedBy { it.source.lowercase() }
@@ -610,7 +610,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         }
         // same arrange twice in a row = reversed order, like PureRef
         if (mode == lastArrange && mode != "random") { order = order.reversed(); lastArrange = "" } else lastArrange = mode
-        moveWithChildren(Arrange.rows(order, viewW().toFloat() / viewH(), r.left, r.top))
+        moveWithChildren(Arrange.masonry(order, viewW().toFloat() / viewH(), r.left, r.top))
     }
 
     fun align(dir: Int) = moveWithChildren(Arrange.align(targets(), dir))
@@ -824,7 +824,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
             val k = if (it.type == NOTE) 0.7f * dp / s else min(1f, viewW() * 0.5f / (max(it.w, it.h) * s))
             it.copy(scale = k)
         }
-        val packed = if (Prefs.packNew) Arrange.rows(
+        val packed = if (Prefs.packNew) Arrange.masonry(
             when (Prefs.packBy) { 1 -> sized.sortedBy { it.name.lowercase() }; 2 -> sized; else -> sized.sortedByDescending { it.bounds().height() } },
             viewW().toFloat() / viewH(), 0f, 0f,
         ) else sized.mapIndexed { i, it -> it.moveBy(i * 30f / s, i * 30f / s) }
@@ -1248,7 +1248,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         if (grid == 0) return
         val light = Prefs.theme == 1
         val s = camScale()
-        var step = GRID
+        var step = Prefs.gridSize.toFloat()
         while (step * s < 18 * dp) step *= 5
         val v = FloatArray(9).also(cam::getValues)
         val tl = toBoard(0f, 0f)
@@ -1394,7 +1394,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         val ids = withDescendants(selected().filter { editable(it) }.map { it.id })
         raw = HashMap(scene.items.filter { it.id in ids }.associateBy { it.id })
         raw.values.toList().union().let { pivot = floatArrayOf(it.centerX(), it.centerY()) }
-        turned = 0f; scaled = 1f
+        turned = 0f; scaled = 1f; pinched = false
     }
 
     private fun move(e: MotionEvent) {
@@ -1441,6 +1441,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         }
         val p = toBoard(n[0], n[1])
         val s = camScale()
+        if (ds != 1f) pinched = true
         raw.replaceAll { _, it -> it.transformed(p[0], p[1], ds, dr, dx / s, dy / s) }
         val single = raw.size == 1
         scene.items.replaceAll { item -> raw[item.id]?.let { if (single) it.copy(rot = snapAngle(it.rot)) else it } ?: item }
@@ -1476,7 +1477,7 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
     private fun up(e: MotionEvent) {
         when (g) {
             G.ITEMS, G.ROTATE, G.SCALE -> if (!moved) downHit?.let { if (mouse && shift) toggle(it) else tap(it, e.x, e.y) } else {
-                if (Prefs.snap && g == G.ITEMS) snapToGrid()
+                if (Prefs.snap && g != G.ROTATE) snapToGrid(raw.keys, scale = pinched || g == G.SCALE)
                 if (g == G.ITEMS) dropIntoGroups()
                 commit()
             }
@@ -1486,7 +1487,10 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
                 !drawing && !viewOnly && linkAt(e.x, e.y) != null -> selectLink(linkAt(e.x, e.y)!!)
                 selection.isNotEmpty() || entered >= 0 || linkSel >= 0 -> clearSelection()
             }
-            G.HANDLE_SCALE, G.HANDLE_ROTATE -> if (moved) commit()
+            G.HANDLE_SCALE, G.HANDLE_ROTATE -> if (moved) {
+                if (Prefs.snap && g == G.HANDLE_SCALE) snapToGrid(handleBase.keys, scale = true)
+                commit()
+            }
             G.LINK -> {
                 val to = hit(e.x, e.y)
                 when {
@@ -1607,11 +1611,21 @@ class BoardView(ctx: Context, scene: Scene, val floating: Boolean = false) : Vie
         select((if (add) selected() + hits else hits).distinctBy { it.id })
     }
 
-    private fun snapToGrid() {
-        scene.items.replaceAll { item ->
-            if (item.id !in raw || item.parent in raw) item
-            else item.bounds().let { b -> item.moveBy((b.left / GRID).roundToInt() * GRID - b.left, (b.top / GRID).roundToInt() * GRID - b.top) }
+    /** Top-left corner on the grid; with [scale], the width too (a whole number of cells), children following their parent. */
+    private fun snapToGrid(ids: Set<Long>, scale: Boolean) {
+        val grid = Prefs.gridSize.toFloat()
+        val m = byId()
+        val out = HashMap<Long, Item>()
+        for (id in ids) {
+            val top = m[id]?.takeIf { it.parent !in ids } ?: continue
+            val b = top.bounds()
+            val k = if (scale) max(1, (b.width() / grid).roundToInt()) * grid / b.width() else 1f
+            val sb = RectF(b.left, b.top, b.left + b.width() * k, b.top + b.height() * k) // scaled around its top-left
+            val dx = (sb.left / grid).roundToInt() * grid - sb.left
+            val dy = (sb.top / grid).roundToInt() * grid - sb.top
+            for (d in withDescendants(listOf(id))) m[d]?.let { out[d] = it.transformed(b.left, b.top, k, 0f, 0f, 0f).moveBy(dx, dy) }
         }
+        scene.items.replaceAll { out[it.id] ?: it }
     }
 
     /** Dropping an item inside a group adds it; dragging it out of its group removes it (PureRef's drag into groups). */

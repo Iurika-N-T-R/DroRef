@@ -75,7 +75,7 @@ Boards move between the two apps as `.pur` files: *File → Open .pur*, *Save*, 
 <details>
 <summary><b>📖 Full guide — gestures, tools, keyboard & mouse</b></summary>
 
-- The canvas fills the screen (dot background by default; grid or plain in the menu, under View; a center cross and a frame around the content too). Round buttons: menu and scene name top-left, undo, redo and focus mode top-right, add bottom-right (a short list: images, paste, note, node, draw).
+- The canvas fills the screen (dot background by default; grid or plain in the menu, under View, with the grid size and snap to grid, which also snaps sizes when you scale; a center cross and a frame around the content too). Round buttons: menu and scene name top-left, undo, redo and focus mode top-right, add bottom-right (a short list: images, paste, note, node, draw).
 - A rail of tools bottom-left: **select**, **hand** (drags and pinches only move the view, nothing moves by accident), **connect**, **draw**, and **lock**: images / videos / drawings, or notes / nodes / connections, can be locked so only the other layer is editable.
 - The menu is a panel of icon tiles grouped by purpose (Add, Board, File, View); search, settings and about sit in its header.
 - **Add** images and videos from the gallery, paste them, paste a link, use *Share → DroRef*, or **drag and drop** them from another app (gallery, browser, files) in split screen: they land where you drop them.

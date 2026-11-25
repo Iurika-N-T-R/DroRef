@@ -39,7 +39,8 @@ object Prefs {
     var keyboardHinted by bool("keyboardHinted", false) // "Ctrl+H shows how" toast, once
     var folders by str("folders", "")             // scene browser folders, one per line (also kept when empty)
     var grid by int("grid", 2)                    // 0 none, 1 lines, 2 dots (default, like VizRef / RefCanvas boards)
-    var snap by bool("snap", false)
+    var snap by bool("snap", false)                // moves and resizes stick to the grid
+    var gridSize by int("gridSize", 50)           // grid cell, in board units: drawn spacing and snap step
     var canvasGray by bool("gray", false)
     var canvasLocked by bool("locked", false)
     var centerCross by bool("centerCross", false) // a cross at the board's origin

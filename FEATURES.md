@@ -20,7 +20,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 - ✅ Axis-snapped move (Shift-drag with a mouse) · 🔜 neighbor-snapped move · ➖ relink missing images (always embedded)
 
 ## Arrange & align
-- ✅ Arrange optimal / by name / addition / order / path / randomly (repeat = reversed); a selected group arranges its contents
+- ✅ Arrange optimal / by name / addition / order / path / randomly (repeat = reversed), as a Pinterest-style masonry that keeps every size; a selected group arranges its contents
 - ✅ Align left / right / top / bottom (push, padding from settings) · ✅ stack · ✅ distribute horizontal / vertical
 - ✅ Normalize height / width / size / area / scale, from first or average · ✅ new images selected and packed
 
@@ -32,7 +32,7 @@ Checklist built from the [PureRef handbook](https://www.pureref.com/handbook/), 
 
 ## Navigation & canvas
 - ✅ Pan, pinch zoom, mouse wheel · ✅ PureRef's mouse controls: left-drag selects, Shift-click adds, Ctrl-drag rotates (Ctrl+Shift: 45° steps), Ctrl+Alt-drag scales, middle / right / Alt-drag pans, right-click menu · ✅ touchpad: two-finger swipe pans, pinch zooms · ✅ double-tap focus (again = back) · ✅ focus canvas · ✅ next / previous
-- ✅ Reset camera / zoom · ✅ lock canvas (Ctrl+R) · ✅ grayscale canvas · ✅ background dots (default) / grid with major lines / plain · ✅ snap to grid
+- ✅ Reset camera / zoom · ✅ lock canvas (Ctrl+R) · ✅ grayscale canvas · ✅ background dots (default) / grid with major lines / plain · ✅ snap to grid (moves and resizes, adjustable grid size)
 - ✅ Full-screen canvas with floating icon buttons, a short icon toolbar for the selection, and grouped icon panels instead of long menus · ✅ focus mode (eye button): UI hidden, look only (from VizRef)
 - ✅ Color picker + image coordinates (RGB / HSV / HEX, tap to copy)
 - ✅ Slideshow (Alt+S): interval and order (ordered / shuffle / random) in settings; panning pauses it
