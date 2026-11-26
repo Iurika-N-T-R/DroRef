@@ -186,7 +186,7 @@
     <string name="downloading">Téléchargement…</string>
     <string name="exporting">Exportation…</string>
     <string name="saved">Enregistré</string>
-    <string name="saved_flattened">Enregistré. Dans le .pur, les dessins deviennent des images, les vidéos une image fixe, et les groupes sont aplatis.</string>
+    <string name="saved_flattened">Enregistré. Dans le .pur, les vidéos deviennent une image fixe.</string>
     <string name="save_failed">Échec de l\'enregistrement : %1$s</string>
     <string name="exported">Exporté</string>
     <string name="export_failed">Échec de l\'export : %1$s</string>

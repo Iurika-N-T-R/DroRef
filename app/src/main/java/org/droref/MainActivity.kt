@@ -1415,7 +1415,10 @@ class MainActivity : Activity(), BoardView.Host {
         val writable = link && keep(uri)
         thread {
             val sc = Scene.create(this, displayName(uri))
-            val r = runCatching { Pur.read(contentResolver.openInputStream(uri)!!.use { it.readBytes() }, sc) }
+            val r = runCatching {
+                val bytes = contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                if (Pur2.isPur2(bytes)) Pur2.read(bytes, sc, cacheDir) else Pur.read(bytes, sc)
+            }
             runOnUiThread {
                 r.onSuccess { skipped ->
                     if (writable) sc.purUri = uri.toString()
@@ -1443,12 +1446,14 @@ class MainActivity : Activity(), BoardView.Host {
         var fake = -1L // ids only used inside the written file
         val items = board.ordered().let { it + linksAsDrawings(board.scene.links, it) { fake-- } }
         val dir = board.scene.images
-        val flattened = items.any { it.type == GROUP || it.type == DRAW || it.type == VIDEO }
+        val flattened = items.any { it.type == VIDEO }
         thread {
             val r = runCatching {
+                // build the whole file first: opening with "wt" empties the target, so a failed save must never get that far
+                val bytes = java.io.ByteArrayOutputStream().also { Pur2.write(items, dir, it, cacheDir) }.toByteArray()
                 // "wt" truncates; some providers only know "w"
                 val out = runCatching { contentResolver.openOutputStream(uri, "wt") }.getOrNull() ?: contentResolver.openOutputStream(uri, "w")!!
-                out.use { Pur.write(items, dir, it) }
+                out.use { it.write(bytes) }
             }
             runOnUiThread {
                 r.onSuccess { toast(s(if (flattened) R.string.saved_flattened else R.string.saved)) }

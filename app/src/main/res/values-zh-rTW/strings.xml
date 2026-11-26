@@ -186,7 +186,7 @@
     <string name="downloading">正在下載…</string>
     <string name="exporting">正在匯出…</string>
     <string name="saved">已儲存</string>
-    <string name="saved_flattened">已儲存。在 .pur 中，繪圖存為圖片，影片存為靜止畫面，群組會被拆開。</string>
+    <string name="saved_flattened">已儲存。在 .pur 中，影片存為靜止畫面。</string>
     <string name="save_failed">儲存失敗：%1$s</string>
     <string name="exported">已匯出</string>
     <string name="export_failed">匯出失敗：%1$s</string>

@@ -186,7 +186,7 @@
     <string name="downloading">ダウンロード中…</string>
     <string name="exporting">書き出し中…</string>
     <string name="saved">保存しました</string>
-    <string name="saved_flattened">保存しました。.pur では描画は画像、動画は静止画になり、グループは解除されます。</string>
+    <string name="saved_flattened">保存しました。.pur では動画は静止画になります。</string>
     <string name="save_failed">保存に失敗しました：%1$s</string>
     <string name="exported">書き出しました</string>
     <string name="export_failed">書き出しに失敗しました：%1$s</string>

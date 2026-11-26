@@ -216,7 +216,7 @@ S = {
 "downloading": ["Downloading…", "Téléchargement…", "Descargando…", "ダウンロード中…", "다운로드 중…", "正在下载…", "正在下載…"],
 "exporting": ["Exporting…", "Exportation…", "Exportando…", "書き出し中…", "내보내는 중…", "正在导出…", "正在匯出…"],
 "saved": ["Saved", "Enregistré", "Guardado", "保存しました", "저장됨", "已保存", "已儲存"],
-"saved_flattened": ["Saved. In the .pur, drawings are images, videos are still frames, and groups are flattened.", "Enregistré. Dans le .pur, les dessins deviennent des images, les vidéos une image fixe, et les groupes sont aplatis.", "Guardado. En el .pur, los dibujos son imágenes, los vídeos un fotograma fijo y los grupos se aplanan.", "保存しました。.pur では描画は画像、動画は静止画になり、グループは解除されます。", "저장됨. .pur에서는 그림은 이미지, 동영상은 정지 화면이 되고 그룹은 해제됩니다.", "已保存。在 .pur 中，绘图保存为图片，视频保存为静帧，编组被拆开。", "已儲存。在 .pur 中，繪圖存為圖片，影片存為靜止畫面，群組會被拆開。"],
+"saved_flattened": ["Saved. In the .pur, videos are still frames.", "Enregistré. Dans le .pur, les vidéos deviennent une image fixe.", "Guardado. En el .pur, los vídeos son un fotograma fijo.", "保存しました。.pur では動画は静止画になります。", "저장됨. .pur에서는 동영상이 정지 화면이 됩니다.", "已保存。在 .pur 中，视频保存为静帧。", "已儲存。在 .pur 中，影片存為靜止畫面。"],
 "save_failed": ["Save failed: %1$s", "Échec de l'enregistrement : %1$s", "Error al guardar: %1$s", "保存に失敗しました：%1$s", "저장 실패: %1$s", "保存失败：%1$s", "儲存失敗：%1$s"],
 "exported": ["Exported", "Exporté", "Exportado", "書き出しました", "내보냄", "已导出", "已匯出"],
 "export_failed": ["Export failed: %1$s", "Échec de l'export : %1$s", "Error al exportar: %1$s", "書き出しに失敗しました：%1$s", "내보내기 실패: %1$s", "导出失败：%1$s", "匯出失敗：%1$s"],
